@@ -13,7 +13,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Sale, Customer, Product, Installment } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
 import { IQD_RATE } from '@/lib/config'
-import { fetchSales, fetchCustomers, fetchProducts, createSale, deleteSale } from '@/lib/api'
+import { fetchSales, fetchCustomers, fetchProducts, createSale, deleteSale, createCustomer } from '@/lib/api'
 
 type Currency = 'USD' | 'IQD'
 type PaymentType = 'نقد' | 'دين' | 'أقساط'
@@ -46,6 +46,10 @@ export default function SalesPage() {
   const [amountPaid, setAmountPaid] = useState('')
   const [items, setItems] = useState<SaleFormItem[]>([{ product_id: '', quantity: '', unit_price: '' }])
 
+  // New customer info (for cash sales)
+  const [newCustName, setNewCustName] = useState('')
+  const [newCustPhone, setNewCustPhone] = useState('')
+
   // Installments
   const [installmentCount, setInstallmentCount] = useState('3')
   const [installmentStart, setInstallmentStart] = useState(() => {
@@ -70,6 +74,7 @@ export default function SalesPage() {
   function openNew() {
     setCurrency('IQD'); setPaymentType('نقد'); setCustomerId(''); setSaleDate(new Date().toISOString().split('T')[0])
     setNote(''); setAmountPaid(''); setDownPayment(''); setInstallmentCount('3')
+    setNewCustName(''); setNewCustPhone('')
     setItems([{ product_id: '', quantity: '', unit_price: '' }])
     setModalOpen(true)
   }
@@ -126,8 +131,14 @@ export default function SalesPage() {
     }
 
     try {
+      let resolvedCustomerId = customerId || null
+      if (!customerId && newCustName.trim()) {
+        const newCust = await createCustomer({ name: newCustName.trim(), phone: newCustPhone.trim() || undefined })
+        resolvedCustomerId = newCust.id
+        setCustomers(prev => [newCust as Customer, ...prev])
+      }
       await createSale({
-        customer_id: customerId || null,
+        customer_id: resolvedCustomerId,
         sale_date: saleDate,
         total_amount: subtotal,
         currency,
@@ -257,8 +268,8 @@ export default function SalesPage() {
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700">الزبون</label>
               <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={customerId} onChange={e => setCustomerId(e.target.value)}>
-                <option value="">بيع نقدي</option>
+                value={customerId} onChange={e => { setCustomerId(e.target.value); setNewCustName(''); setNewCustPhone('') }}>
+                <option value="">بيع نقدي (زبون جديد اختياري)</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -268,6 +279,16 @@ export default function SalesPage() {
             <Select label="نوع الدفع" value={paymentType} onChange={e => setPaymentType(e.target.value as PaymentType)}
               options={[{ value: 'نقد', label: 'نقد' }, { value: 'دين', label: 'دين (آجل)' }, { value: 'أقساط', label: 'أقساط' }]} />
           </div>
+
+          {!customerId && (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-2 font-medium">معلومات الزبون (اختياري — لحفظه في قائمة الزبائن)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input label="اسم الزبون" value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="اسم الزبون" />
+                <Input label="رقم الهاتف" type="tel" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} placeholder="07xx xxx xxxx" dir="ltr" />
+              </div>
+            </div>
+          )}
 
           {/* Mobile: card layout */}
           <div className="md:hidden space-y-3">
