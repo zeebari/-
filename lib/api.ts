@@ -122,8 +122,9 @@ export async function createCustomerPayment(body: {
     .single()
   if (error) throw error
 
+  const amtUSD = body.currency === 'USD' ? body.amount : body.amount / body.exchange_rate
   const { data: cust } = await supabase.from('customers').select('balance_owed').eq('id', body.customer_id).single()
-  await supabase.from('customers').update({ balance_owed: Math.max(0, (cust?.balance_owed ?? 0) - body.amount) }).eq('id', body.customer_id)
+  await supabase.from('customers').update({ balance_owed: Math.max(0, (cust?.balance_owed ?? 0) - amtUSD) }).eq('id', body.customer_id)
 
   if (body.sale_id) {
     const { data: sale } = await supabase.from('sales').select('total_amount, amount_paid').eq('id', body.sale_id).single()
@@ -210,8 +211,9 @@ export async function createSale(body: {
 
   if (saleData.customer_id && status !== 'مدفوع') {
     const remaining = saleData.total_amount - (saleData.amount_paid ?? 0)
+    const remainingUSD = saleData.currency === 'USD' ? remaining : remaining / saleData.exchange_rate
     const { data: cust } = await supabase.from('customers').select('balance_owed').eq('id', saleData.customer_id).single()
-    await supabase.from('customers').update({ balance_owed: (cust?.balance_owed ?? 0) + remaining }).eq('id', saleData.customer_id)
+    await supabase.from('customers').update({ balance_owed: (cust?.balance_owed ?? 0) + remainingUSD }).eq('id', saleData.customer_id)
   }
 
   return sale
@@ -440,6 +442,7 @@ export async function fetchSalesReport(from?: string, to?: string) {
   let query = supabase
     .from('sales')
     .select('*, customers(name), sale_items(quantity, unit_price, total, products(name))')
+    .is('deleted_at', null)
     .order('sale_date', { ascending: false })
   if (from) query = query.gte('sale_date', from)
   if (to) query = query.lte('sale_date', to)
@@ -450,8 +453,8 @@ export async function fetchSalesReport(from?: string, to?: string) {
 
 export async function fetchDebtsReport() {
   const [customers, suppliers] = await Promise.all([
-    supabase.from('customers').select('*').gt('balance_owed', 0).order('balance_owed', { ascending: false }),
-    supabase.from('suppliers').select('*').gt('balance_owed', 0).order('balance_owed', { ascending: false }),
+    supabase.from('customers').select('*').is('deleted_at', null).gt('balance_owed', 0).order('balance_owed', { ascending: false }),
+    supabase.from('suppliers').select('*').is('deleted_at', null).gt('balance_owed', 0).order('balance_owed', { ascending: false }),
   ])
   return { customers: customers.data ?? [], suppliers: suppliers.data ?? [] }
 }
