@@ -11,7 +11,8 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, FileText, Search } from 'lucide-react'
 import type { Sale, Customer, Product, Installment } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
-import { fetchSales, fetchCustomers, fetchProducts, fetchExchangeRate, createSale } from '@/lib/api'
+import { IQD_RATE } from '@/lib/config'
+import { fetchSales, fetchCustomers, fetchProducts, createSale } from '@/lib/api'
 
 type Currency = 'USD' | 'IQD'
 type PaymentType = 'نقد' | 'دين' | 'أقساط'
@@ -26,10 +27,10 @@ export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
-  const [rate, setRate] = useState(1310)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [detailSale, setDetailSale] = useState<Sale | null>(null)
 
@@ -54,13 +55,12 @@ export default function SalesPage() {
 
   async function loadData() {
     setLoading(true)
-    const [salesData, custsData, prodsData, rateData] = await Promise.all([
-      fetchSales(), fetchCustomers(), fetchProducts(), fetchExchangeRate(),
+    const [salesData, custsData, prodsData] = await Promise.all([
+      fetchSales(), fetchCustomers(), fetchProducts(),
     ])
     setSales(salesData as Sale[])
     setCustomers(custsData as Customer[])
     setProducts(prodsData as Product[])
-    setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
@@ -76,7 +76,7 @@ export default function SalesPage() {
     if (field === 'product_id') {
       const prod = products.find(p => p.id === value)
       if (prod) {
-        const price = currency === 'USD' ? prod.sale_price_usd : Math.round(prod.sale_price_usd * rate)
+        const price = currency === 'USD' ? prod.sale_price_usd : Math.round(prod.sale_price_usd * IQD_RATE)
         setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: value, unit_price: String(price) } : it))
       }
     }
@@ -102,6 +102,7 @@ export default function SalesPage() {
     const validItems = items.filter(i => i.product_id && i.quantity && i.unit_price)
     if (validItems.length === 0) return
     setSaving(true)
+    setSaveError('')
 
     let paidAmount = parseFloat(amountPaid || '0')
     let installmentsData: { due_date: string; amount: number }[] = []
@@ -113,20 +114,24 @@ export default function SalesPage() {
       installmentsData = generateInstallments()
     }
 
-    await createSale({
-      customer_id: customerId || null,
-      sale_date: saleDate,
-      total_amount: subtotal,
-      currency,
-      exchange_rate: rate,
-      payment_type: paymentType,
-      amount_paid: paidAmount,
-      note: note || null,
-      items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
-      installments: installmentsData,
-    })
-    await loadData()
-    setModalOpen(false)
+    try {
+      await createSale({
+        customer_id: customerId || null,
+        sale_date: saleDate,
+        total_amount: subtotal,
+        currency,
+        exchange_rate: IQD_RATE,
+        payment_type: paymentType,
+        amount_paid: paidAmount,
+        note: note || null,
+        items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
+        installments: installmentsData,
+      })
+      await loadData()
+      setModalOpen(false)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'حدث خطأ')
+    }
     setSaving(false)
   }
 
@@ -288,7 +293,7 @@ export default function SalesPage() {
 
           <div className="bg-blue-50 rounded-lg p-4 text-right">
             <div className="text-2xl font-bold text-blue-700">المجموع: {subtotal.toFixed(2)} {currency}</div>
-            {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * rate).toLocaleString()} د.ع</div>}
+            {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * IQD_RATE).toLocaleString()} د.ع</div>}
           </div>
 
           {paymentType === 'نقد' && (
@@ -328,6 +333,9 @@ export default function SalesPage() {
 
           <Textarea label="ملاحظة" value={note} onChange={e => setNote(e.target.value)} placeholder="ملاحظات اختيارية" />
 
+          {saveError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{saveError}</div>
+          )}
           <div className="flex gap-3 justify-end pt-2">
             <Button variant="outline" onClick={() => setModalOpen(false)}>إلغاء</Button>
             <Button onClick={handleSave} loading={saving}>حفظ الفاتورة</Button>
@@ -345,7 +353,6 @@ export default function SalesPage() {
               <div><span className="text-slate-500">نوع الدفع:</span> <Badge variant="info">{detailSale.payment_type}</Badge></div>
               <div><span className="text-slate-500">الحالة:</span> {statusBadge(detailSale.status)}</div>
               <div><span className="text-slate-500">العملة:</span> <strong>{detailSale.currency}</strong></div>
-              <div><span className="text-slate-500">سعر الصرف:</span> <strong>1$ = {detailSale.exchange_rate} د.ع</strong></div>
             </div>
 
             <Table>
@@ -376,7 +383,7 @@ export default function SalesPage() {
               {detailSale.currency === 'USD' && (
                 <div className="flex justify-between text-slate-500 text-xs pt-1 border-t border-slate-200">
                   <span>المجموع بالدينار:</span>
-                  <strong>{(detailSale.total_amount * detailSale.exchange_rate).toLocaleString()} د.ع</strong>
+                  <strong>{(detailSale.total_amount * IQD_RATE).toLocaleString()} د.ع</strong>
                 </div>
               )}
             </div>

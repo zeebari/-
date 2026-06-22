@@ -10,8 +10,9 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, Pencil, CreditCard, History } from 'lucide-react'
 import type { Customer, Sale } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
 import {
-  fetchCustomers, fetchExchangeRate, fetchSales,
+  fetchCustomers, fetchSales,
   createCustomer, updateCustomer, createCustomerPayment,
 } from '@/lib/api'
 
@@ -20,7 +21,6 @@ type ModalType = 'add' | 'edit' | 'payment' | 'history' | null
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [sales, setSales] = useState<Sale[]>([])
-  const [rate, setRate] = useState(1310)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState<ModalType>(null)
@@ -32,9 +32,8 @@ export default function CustomersPage() {
 
   async function loadData() {
     setLoading(true)
-    const [custData, rateData] = await Promise.all([fetchCustomers(), fetchExchangeRate()])
+    const custData = await fetchCustomers()
     setCustomers(custData as Customer[])
-    setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
@@ -62,7 +61,7 @@ export default function CustomersPage() {
       sale_id: payForm.sale_id || null,
       amount: parseFloat(payForm.amount),
       currency: payForm.currency,
-      exchange_rate: rate,
+      exchange_rate: IQD_RATE,
       payment_date: payForm.payment_date,
       note: payForm.note || null,
     })
@@ -110,7 +109,7 @@ export default function CustomersPage() {
                 <Td className={c.balance_owed > 0 ? 'font-semibold text-red-600' : 'text-green-600'}>
                   {formatCurrency(c.balance_owed, 'USD')}
                 </Td>
-                <Td className="text-slate-500">{formatCurrency(c.balance_owed * rate, 'IQD')}</Td>
+                <Td className="text-slate-500">{formatCurrency(c.balance_owed * IQD_RATE, 'IQD')}</Td>
                 <Td>
                   <div className="flex gap-1">
                     <button onClick={() => { setSelected(c); setForm({ name: c.name, phone: c.phone ?? '', address: c.address ?? '' }); setModal('edit') }}
@@ -151,7 +150,7 @@ export default function CustomersPage() {
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
             رصيد الدين: <strong>{formatCurrency(selected?.balance_owed ?? 0, 'USD')}</strong>
-            <span className="text-xs mr-1">= {formatCurrency((selected?.balance_owed ?? 0) * rate, 'IQD')}</span>
+            <span className="text-xs mr-1">= {formatCurrency((selected?.balance_owed ?? 0) * IQD_RATE, 'IQD')}</span>
           </div>
           <Input label="المبلغ المدفوع *" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} />
           <div className="grid grid-cols-2 gap-3">

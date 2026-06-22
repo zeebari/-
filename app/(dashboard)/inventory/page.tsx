@@ -10,11 +10,11 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { FileSpreadsheet, FileText, Pencil, AlertTriangle, Search } from 'lucide-react'
 import type { Inventory } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
-import { fetchInventory, fetchExchangeRate, updateInventory } from '@/lib/api'
+import { IQD_RATE } from '@/lib/config'
+import { fetchInventory, updateInventory } from '@/lib/api'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<Inventory[]>([])
-  const [rate, setRate] = useState(1310)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -25,9 +25,8 @@ export default function InventoryPage() {
 
   async function loadData() {
     setLoading(true)
-    const [invData, rateData] = await Promise.all([fetchInventory(), fetchExchangeRate()])
+    const invData = await fetchInventory()
     setItems(invData as Inventory[])
-    setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
@@ -81,8 +80,7 @@ export default function InventoryPage() {
         min_quantity: i.min_quantity,
         cost_price_usd: i.products?.cost_price_usd ?? 0,
         sale_price_usd: i.products?.sale_price_usd ?? 0,
-      })),
-      rate
+      }))
     )
   }
 
@@ -155,7 +153,7 @@ export default function InventoryPage() {
                     </Td>
                     <Td className="text-slate-500">{item.min_quantity}</Td>
                     <Td>{formatCurrency(item.products?.sale_price_usd ?? 0, 'USD')}</Td>
-                    <Td className="text-slate-500">{formatCurrency((item.products?.sale_price_usd ?? 0) * rate, 'IQD')}</Td>
+                    <Td className="text-slate-500">{formatCurrency((item.products?.sale_price_usd ?? 0) * IQD_RATE, 'IQD')}</Td>
                     <Td>
                       <Badge variant={isLow ? 'danger' : 'success'}>
                         {isLow ? 'منخفض' : 'جيد'}

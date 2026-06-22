@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react'
 import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { formatCurrency } from '@/lib/currency'
-import { TrendingUp, Users, Truck, AlertTriangle, DollarSign, Calendar } from 'lucide-react'
+import { IQD_RATE } from '@/lib/config'
+import { TrendingUp, Users, Truck, AlertTriangle, DollarSign } from 'lucide-react'
 
 interface DashboardStats {
   today_sales_usd: number
@@ -23,20 +24,13 @@ interface StatCard {
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [rate, setRate] = useState(1310)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function load() {
-      const [statsData, rateData] = await Promise.all([
-        import('@/lib/api').then(m => m.fetchDashboardStats()),
-        import('@/lib/api').then(m => m.fetchExchangeRate()),
-      ])
-      setStats(statsData)
-      setRate(rateData.usd_to_iqd ?? 1310)
+    import('@/lib/api').then(m => m.fetchDashboardStats()).then(data => {
+      setStats(data)
       setLoading(false)
-    }
-    load()
+    })
   }, [])
 
   const cards: StatCard[] = stats
@@ -44,7 +38,7 @@ export default function DashboardPage() {
         {
           label: 'مبيعات اليوم',
           value: formatCurrency(stats.today_sales_usd, 'USD'),
-          subvalue: formatCurrency(stats.today_sales_usd * rate, 'IQD'),
+          subvalue: formatCurrency(stats.today_sales_usd * IQD_RATE, 'IQD'),
           icon: DollarSign,
           color: 'text-blue-600',
           bgColor: 'bg-blue-50',
@@ -52,7 +46,7 @@ export default function DashboardPage() {
         {
           label: 'مبيعات الشهر',
           value: formatCurrency(stats.month_sales_usd, 'USD'),
-          subvalue: formatCurrency(stats.month_sales_usd * rate, 'IQD'),
+          subvalue: formatCurrency(stats.month_sales_usd * IQD_RATE, 'IQD'),
           icon: TrendingUp,
           color: 'text-green-600',
           bgColor: 'bg-green-50',
@@ -60,7 +54,7 @@ export default function DashboardPage() {
         {
           label: 'ديون الزبائن',
           value: formatCurrency(stats.customer_debt_usd, 'USD'),
-          subvalue: formatCurrency(stats.customer_debt_usd * rate, 'IQD'),
+          subvalue: formatCurrency(stats.customer_debt_usd * IQD_RATE, 'IQD'),
           icon: Users,
           color: 'text-orange-600',
           bgColor: 'bg-orange-50',
@@ -68,7 +62,7 @@ export default function DashboardPage() {
         {
           label: 'مستحق للموردين',
           value: formatCurrency(stats.supplier_debt_usd, 'USD'),
-          subvalue: formatCurrency(stats.supplier_debt_usd * rate, 'IQD'),
+          subvalue: formatCurrency(stats.supplier_debt_usd * IQD_RATE, 'IQD'),
           icon: Truck,
           color: 'text-purple-600',
           bgColor: 'bg-purple-50',
@@ -79,13 +73,6 @@ export default function DashboardPage() {
           icon: AlertTriangle,
           color: 'text-red-600',
           bgColor: 'bg-red-50',
-        },
-        {
-          label: 'سعر الصرف',
-          value: `1 $ = ${rate.toLocaleString()} د.ع`,
-          icon: Calendar,
-          color: 'text-slate-600',
-          bgColor: 'bg-slate-50',
         },
       ]
     : []

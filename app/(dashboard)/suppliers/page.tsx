@@ -11,8 +11,9 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, Pencil, ShoppingBag, CreditCard } from 'lucide-react'
 import type { Supplier, PurchaseOrder, Product } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
 import {
-  fetchSuppliers, fetchProducts, fetchExchangeRate,
+  fetchSuppliers, fetchProducts,
   createSupplier, updateSupplier,
   fetchPurchaseOrders, createPurchaseOrder, createSupplierPayment,
 } from '@/lib/api'
@@ -23,7 +24,6 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
-  const [rate, setRate] = useState(1310)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState<ModalType>(null)
@@ -42,10 +42,9 @@ export default function SuppliersPage() {
 
   async function loadData() {
     setLoading(true)
-    const [sups, prods, rateData] = await Promise.all([fetchSuppliers(), fetchProducts(), fetchExchangeRate()])
+    const [sups, prods] = await Promise.all([fetchSuppliers(), fetchProducts()])
     setSuppliers(sups as Supplier[])
     setProducts(prods as Product[])
-    setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
@@ -76,7 +75,7 @@ export default function SuppliersPage() {
       order_date: orderDate,
       total_amount: total,
       currency: orderCurrency,
-      exchange_rate: rate,
+      exchange_rate: IQD_RATE,
       amount_paid: paid,
       status: paid >= total ? 'مدفوع' : paid > 0 ? 'جزئي' : 'معلق',
       note: orderNote || null,
@@ -94,7 +93,7 @@ export default function SuppliersPage() {
       purchase_order_id: payForm.purchase_order_id || null,
       amount: parseFloat(payForm.amount),
       currency: payForm.currency,
-      exchange_rate: rate,
+      exchange_rate: IQD_RATE,
       payment_date: payForm.payment_date,
       note: payForm.note || null,
     })
@@ -247,7 +246,7 @@ export default function SuppliersPage() {
             </Button>
             <div className="text-lg font-bold text-slate-900">
               المجموع: {orderTotal().toFixed(2)} {orderCurrency}
-              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * rate).toLocaleString()} د.ع</span>}
+              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * IQD_RATE).toLocaleString()} د.ع</span>}
             </div>
           </div>
 

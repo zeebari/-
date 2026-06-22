@@ -117,10 +117,20 @@ export async function createSale(body: {
   if (saleError) throw saleError
 
   if (items.length > 0) {
+    // Validate stock before inserting anything
+    for (const item of items) {
+      const { data: inv } = await supabase.from('inventory').select('quantity, products(name)').eq('product_id', item.product_id).single()
+      const available = inv?.quantity ?? 0
+      if (available < item.quantity) {
+        await supabase.from('sales').delete().eq('id', sale.id)
+        const productName = (inv as { products?: { name?: string } } | null)?.products?.name ?? 'المنتج'
+        throw new Error(`الكمية المطلوبة (${item.quantity}) أكبر من المتوفر في المخزون (${available}) للمنتج: ${productName}`)
+      }
+    }
     await supabase.from('sale_items').insert(items.map(i => ({ ...i, sale_id: sale.id })))
     for (const item of items) {
       const { data: inv } = await supabase.from('inventory').select('quantity').eq('product_id', item.product_id).single()
-      const newQty = Math.max(0, (inv?.quantity ?? 0) - item.quantity)
+      const newQty = (inv?.quantity ?? 0) - item.quantity
       await supabase.from('inventory').update({ quantity: newQty, updated_at: new Date().toISOString() }).eq('product_id', item.product_id)
       await supabase.from('inventory_transactions').insert({
         product_id: item.product_id,

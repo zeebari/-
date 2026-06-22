@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, Trash2, BarChart3 } from 'lucide-react'
 import { formatCurrency } from '@/lib/currency'
-import { fetchExpenses, createExpense, deleteExpense, fetchExchangeRate, type Expense } from '@/lib/api'
+import { IQD_RATE } from '@/lib/config'
+import { fetchExpenses, createExpense, deleteExpense, type Expense } from '@/lib/api'
 
 const CATEGORIES = ['إيجار', 'رواتب', 'كهرباء وماء', 'نقل وتوصيل', 'صيانة', 'تسويق', 'مستلزمات مكتبية', 'أخرى']
 
@@ -23,7 +24,6 @@ const emptyForm = {
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<Expense[]>([])
-  const [rate, setRate] = useState(1310)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showModal, setShowModal] = useState(false)
@@ -35,7 +35,6 @@ export default function ExpensesPage() {
   const [to, setTo] = useState(new Date().toISOString().split('T')[0])
 
   useEffect(() => {
-    fetchExchangeRate().then(d => setRate(d.usd_to_iqd ?? 1310))
     loadExpenses()
   }, [])
 
@@ -54,7 +53,7 @@ export default function ExpensesPage() {
       description: form.description,
       amount: parseFloat(form.amount),
       currency: form.currency,
-      exchange_rate: form.currency === 'IQD' ? rate : 1,
+      exchange_rate: form.currency === 'IQD' ? IQD_RATE : 1,
       expense_date: form.expense_date,
       note: form.note || undefined,
     })
@@ -101,7 +100,7 @@ export default function ExpensesPage() {
             <BarChart3 size={24} className="text-red-500 mx-auto mb-2" />
             <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalUSD, 'USD')}</div>
             <div className="text-sm text-slate-500">إجمالي المصاريف $</div>
-            <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalUSD * rate, 'IQD')}</div>
+            <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalUSD * IQD_RATE, 'IQD')}</div>
           </div>
           <div className="card col-span-2">
             <div className="text-sm font-medium text-slate-700 mb-3">توزيع حسب الفئة</div>

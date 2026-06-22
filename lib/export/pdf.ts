@@ -1,184 +1,219 @@
 'use client'
 
-const BASE_STYLES = `
-  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Tajawal', sans-serif; direction: rtl; color: #1e293b; font-size: 13px; padding: 20px; }
-  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
-  .meta { color: #64748b; font-size: 12px; margin-bottom: 16px; }
-  table { width: 100%; border-collapse: collapse; }
-  th { background: #2563eb; color: white; padding: 8px 10px; text-align: right; font-weight: 600; font-size: 12px; }
-  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
-  tr:nth-child(even) td { background: #f8fafc; }
-  .badge-low { color: #dc2626; font-weight: 600; }
-  .badge-ok { color: #16a34a; }
-  .total-row { background: #f1f5f9 !important; font-weight: 700; }
-  @media print {
-    body { padding: 10px; }
-    button { display: none; }
-  }
+const FONT = `@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');`
+
+const BASE = `
+${FONT}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  font-family: 'Tajawal', sans-serif;
+  direction: rtl;
+  color: #1e293b;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.page { padding: 32px 36px; min-height: 100vh; display: flex; flex-direction: column; }
+.header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-bottom: 16px;
+  border-bottom: 3px solid #2563eb;
+  margin-bottom: 20px;
+}
+.company { }
+.company-name { font-size: 20px; font-weight: 800; color: #1e3a8a; }
+.company-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+.report-info { text-align: left; }
+.report-title { font-size: 18px; font-weight: 700; color: #2563eb; }
+.report-date { font-size: 11px; color: #94a3b8; margin-top: 3px; }
+table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+thead tr { background: #1e3a8a; }
+th {
+  color: #fff; font-weight: 600; font-size: 12px;
+  padding: 9px 11px; text-align: right;
+  white-space: nowrap;
+}
+td { padding: 8px 11px; font-size: 12px; border-bottom: 1px solid #e2e8f0; }
+tr:nth-child(even) td { background: #f8fafc; }
+tr:last-child td { border-bottom: none; }
+.low { color: #dc2626; font-weight: 700; }
+.ok  { color: #16a34a; font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+.footer {
+  margin-top: auto; padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  display: flex; justify-content: space-between;
+  font-size: 10px; color: #94a3b8;
+}
+/* Invoice-specific */
+.inv-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; margin-bottom: 20px; font-size: 12px; }
+.inv-meta .label { color: #64748b; }
+.inv-meta .value { font-weight: 600; }
+.totals { margin-top: 16px; background: #f8fafc; border-radius: 8px; padding: 14px 16px; }
+.total-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.total-row.grand { border-top: 2px solid #e2e8f0; margin-top: 6px; padding-top: 10px; font-size: 15px; font-weight: 800; }
+.status { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 11px; font-weight: 700; }
+.note-box { margin-top: 16px; background: #fefce8; border: 1px solid #fde68a; border-radius: 6px; padding: 10px 14px; font-size: 12px; color: #713f12; }
+/* Screen hint — hidden on print */
+.hint { font-size: 11px; color: #94a3b8; background: #f1f5f9; border-radius: 6px; padding: 7px 12px; margin-bottom: 18px; }
+@media print {
+  .hint { display: none; }
+  @page { size: A4; margin: 1.2cm 1cm; }
+  body { font-size: 12px; }
+}
 `
 
-function openPrint(html: string) {
-  const win = window.open('', '_blank', 'width=900,height=700')
+function open(html: string, title: string) {
+  const win = window.open('', '_blank', 'width=950,height=750')
   if (!win) return
-  win.document.write(html)
+  win.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <style>${BASE}</style>
+</head>
+<body>${html}</body>
+</html>`)
   win.document.close()
   win.onload = () => { win.focus(); win.print() }
 }
 
 export async function exportInventoryToPdf(
   items: {
-    name: string
-    category: string
-    unit: string
-    quantity: number
-    min_quantity: number
-    cost_price_usd: number
-    sale_price_usd: number
+    name: string; category: string; unit: string
+    quantity: number; min_quantity: number
+    cost_price_usd: number; sale_price_usd: number
   }[],
-  exchangeRate: number
+  _rate?: number
 ) {
-  const date = new Date().toLocaleDateString('ar-IQ')
+  const date = new Date().toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
+  const lowCount = items.filter(i => i.quantity <= i.min_quantity).length
+
   const rows = items.map(i => {
     const isLow = i.quantity <= i.min_quantity
-    return `
-      <tr>
-        <td>${i.name}</td>
-        <td>${i.category || '—'}</td>
-        <td>${i.unit}</td>
-        <td class="${isLow ? 'badge-low' : ''}">${i.quantity}</td>
-        <td>${i.min_quantity}</td>
-        <td>$${i.cost_price_usd.toFixed(2)}</td>
-        <td>$${i.sale_price_usd.toFixed(2)}</td>
-        <td>${Math.round(i.sale_price_usd * exchangeRate).toLocaleString()} د.ع</td>
-        <td class="${isLow ? 'badge-low' : 'badge-ok'}">${isLow ? 'منخفض' : 'جيد'}</td>
-      </tr>
-    `
+    return `<tr>
+      <td>${i.name}</td>
+      <td>${i.category || '—'}</td>
+      <td>${i.unit}</td>
+      <td class="num ${isLow ? 'low' : ''}">${i.quantity}</td>
+      <td class="num">${i.min_quantity}</td>
+      <td class="num">$${i.cost_price_usd.toFixed(2)}</td>
+      <td class="num">$${i.sale_price_usd.toFixed(2)}</td>
+      <td class="${isLow ? 'low' : 'ok'}">${isLow ? '⚠ منخفض' : '✓ جيد'}</td>
+    </tr>`
   }).join('')
 
-  openPrint(`<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head><meta charset="UTF-8"><title>تقرير المخزون</title>
-<style>${BASE_STYLES}</style>
-</head>
-<body>
-  <h1>تقرير المخزون</h1>
-  <div class="meta">التاريخ: ${date} &nbsp;|&nbsp; سعر الصرف: 1$ = ${exchangeRate.toLocaleString()} د.ع &nbsp;|&nbsp; عدد المنتجات: ${items.length}</div>
+  open(`
+<div class="page">
+  <div class="hint">💡 لإخفاء تذييل المتصفح عند الطباعة: More settings ← أوقف "Headers and footers"</div>
+  <div class="header">
+    <div class="company">
+      <div class="company-name">نظام المحاسبة</div>
+      <div class="company-sub">غذائية وكهربائية</div>
+    </div>
+    <div class="report-info">
+      <div class="report-title">تقرير المخزون</div>
+      <div class="report-date">${date}</div>
+    </div>
+  </div>
+
   <table>
-    <thead>
-      <tr>
-        <th>المنتج</th><th>الفئة</th><th>الوحدة</th><th>الكمية</th>
-        <th>حد التنبيه</th><th>سعر التكلفة</th><th>سعر البيع $</th>
-        <th>سعر البيع د.ع</th><th>الحالة</th>
-      </tr>
-    </thead>
+    <thead><tr>
+      <th>المنتج</th><th>الفئة</th><th>الوحدة</th>
+      <th>الكمية</th><th>حد التنبيه</th>
+      <th>سعر التكلفة</th><th>سعر البيع $</th><th>الحالة</th>
+    </tr></thead>
     <tbody>${rows}</tbody>
   </table>
-</body>
-</html>`)
+
+  <div class="footer">
+    <span>إجمالي المنتجات: <strong>${items.length}</strong></span>
+    ${lowCount > 0 ? `<span style="color:#dc2626">منتجات منخفضة: <strong>${lowCount}</strong></span>` : ''}
+    <span>${date}</span>
+  </div>
+</div>`, 'تقرير المخزون')
 }
 
 export async function exportSaleToPdf(sale: {
-  id: string
-  sale_date: string
-  customer_name: string | null
-  payment_type: string
-  currency: string
-  exchange_rate: number
-  total_amount: number
-  amount_paid: number
-  status: string
+  id: string; sale_date: string; customer_name: string | null
+  payment_type: string; currency: string; exchange_rate: number
+  total_amount: number; amount_paid: number; status: string
   note: string | null
   items: { product_name: string; quantity: number; unit_price: number; total: number }[]
   installments?: { due_date: string; amount: number; status: string }[]
 }) {
   const remaining = sale.total_amount - sale.amount_paid
   const statusColor = sale.status === 'مدفوع' ? '#16a34a' : sale.status === 'جزئي' ? '#d97706' : '#dc2626'
+  const date = new Date(sale.sale_date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
 
-  const itemRows = sale.items.map(i => `
-    <tr>
-      <td>${i.product_name}</td>
-      <td style="text-align:center">${i.quantity}</td>
-      <td style="text-align:left">${i.unit_price.toFixed(2)}</td>
-      <td style="text-align:left;font-weight:600">${i.total.toFixed(2)}</td>
-    </tr>
-  `).join('')
+  const itemRows = sale.items.map(i => `<tr>
+    <td>${i.product_name}</td>
+    <td class="num" style="text-align:center">${i.quantity}</td>
+    <td class="num">${i.unit_price.toFixed(2)} ${sale.currency}</td>
+    <td class="num" style="font-weight:700">${i.total.toFixed(2)} ${sale.currency}</td>
+  </tr>`).join('')
 
-  const installmentRows = (sale.installments ?? []).map((inst, i) => `
-    <tr>
-      <td>قسط ${i + 1}</td>
-      <td>${inst.due_date}</td>
-      <td style="text-align:left">${inst.amount.toFixed(2)} ${sale.currency}</td>
-      <td class="${inst.status === 'مدفوع' ? 'badge-ok' : 'badge-low'}">${inst.status}</td>
-    </tr>
-  `).join('')
+  const instRows = (sale.installments ?? []).map((inst, i) => `<tr>
+    <td>قسط ${i + 1}</td>
+    <td>${new Date(inst.due_date).toLocaleDateString('ar-IQ')}</td>
+    <td class="num">${inst.amount.toFixed(2)} ${sale.currency}</td>
+    <td class="${inst.status === 'مدفوع' ? 'ok' : 'low'}">${inst.status}</td>
+  </tr>`).join('')
 
-  const installmentsSection = sale.installments && sale.installments.length > 0 ? `
-    <h2 style="margin-top:24px;margin-bottom:8px;font-size:15px;">جدول الأقساط</h2>
-    <table>
-      <thead><tr><th>البيان</th><th>تاريخ الاستحقاق</th><th>المبلغ</th><th>الحالة</th></tr></thead>
-      <tbody>${installmentRows}</tbody>
-    </table>
-  ` : ''
+  const instSection = sale.installments?.length ? `
+    <div style="margin-top:24px">
+      <div style="font-weight:700;margin-bottom:8px;color:#1e3a8a">جدول الأقساط</div>
+      <table>
+        <thead><tr><th>البيان</th><th>الاستحقاق</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+        <tbody>${instRows}</tbody>
+      </table>
+    </div>` : ''
 
-  openPrint(`<!DOCTYPE html>
-<html dir="rtl" lang="ar">
-<head><meta charset="UTF-8"><title>فاتورة #${sale.id.slice(0, 8).toUpperCase()}</title>
-<style>
-${BASE_STYLES}
-.invoice-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px; padding-bottom:16px; border-bottom:2px solid #2563eb; }
-.company-name { font-size:22px; font-weight:700; color:#2563eb; }
-.invoice-title { font-size:28px; font-weight:700; color:#1e293b; text-align:left; }
-.invoice-num { color:#64748b; font-size:13px; text-align:left; }
-.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
-.info-item { font-size:12px; } .info-item span { color:#64748b; }
-.totals { margin-top:16px; padding:12px 16px; background:#f8fafc; border-radius:8px; }
-.total-line { display:flex; justify-content:space-between; padding:4px 0; font-size:13px; }
-.total-line.main { font-size:16px; font-weight:700; border-top:1px solid #e2e8f0; margin-top:4px; padding-top:8px; }
-.status-badge { display:inline-block; padding:2px 10px; border-radius:999px; font-weight:600; font-size:12px; color:${statusColor}; border:1px solid ${statusColor}; }
-</style>
-</head>
-<body>
-  <div class="invoice-header">
-    <div>
+  open(`
+<div class="page">
+  <div class="hint">💡 لإخفاء تذييل المتصفح: More settings ← أوقف "Headers and footers"</div>
+  <div class="header">
+    <div class="company">
       <div class="company-name">نظام المحاسبة</div>
-      <div style="color:#64748b;font-size:12px;margin-top:2px">غذائية وكهربائية</div>
+      <div class="company-sub">غذائية وكهربائية</div>
     </div>
-    <div style="text-align:left">
-      <div class="invoice-title">فاتورة بيع</div>
-      <div class="invoice-num">#${sale.id.slice(0, 8).toUpperCase()}</div>
+    <div class="report-info">
+      <div class="report-title">فاتورة بيع</div>
+      <div class="report-date">#${sale.id.slice(0, 8).toUpperCase()}</div>
     </div>
   </div>
 
-  <div class="info-grid">
-    <div class="info-item"><span>الزبون: </span><strong>${sale.customer_name ?? 'بيع نقدي'}</strong></div>
-    <div class="info-item"><span>التاريخ: </span><strong>${sale.sale_date}</strong></div>
-    <div class="info-item"><span>نوع الدفع: </span><strong>${sale.payment_type}</strong></div>
-    <div class="info-item"><span>العملة: </span><strong>${sale.currency}</strong></div>
-    <div class="info-item"><span>سعر الصرف: </span><strong>1$ = ${sale.exchange_rate.toLocaleString()} د.ع</strong></div>
-    <div class="info-item"><span>الحالة: </span><span class="status-badge">${sale.status}</span></div>
+  <div class="inv-meta">
+    <div><span class="label">الزبون: </span><span class="value">${sale.customer_name ?? 'بيع نقدي'}</span></div>
+    <div><span class="label">التاريخ: </span><span class="value">${date}</span></div>
+    <div><span class="label">نوع الدفع: </span><span class="value">${sale.payment_type}</span></div>
+    <div><span class="label">العملة: </span><span class="value">${sale.currency}</span></div>
+    <div><span class="label">الحالة: </span>
+      <span class="status" style="color:${statusColor};border:1.5px solid ${statusColor}">${sale.status}</span>
+    </div>
   </div>
 
   <table>
-    <thead>
-      <tr><th>المنتج</th><th style="text-align:center">الكمية</th><th style="text-align:left">سعر الوحدة (${sale.currency})</th><th style="text-align:left">المجموع (${sale.currency})</th></tr>
-    </thead>
+    <thead><tr><th>المنتج</th><th style="text-align:center">الكمية</th><th>سعر الوحدة</th><th>المجموع</th></tr></thead>
     <tbody>${itemRows}</tbody>
   </table>
 
   <div class="totals">
-    <div class="total-line"><span>المجموع</span><span>${sale.total_amount.toFixed(2)} ${sale.currency}</span></div>
-    <div class="total-line" style="color:#16a34a"><span>المدفوع</span><span>${sale.amount_paid.toFixed(2)} ${sale.currency}</span></div>
-    <div class="total-line main" style="color:${remaining > 0 ? '#dc2626' : '#16a34a'}">
-      <span>المتبقي</span><span>${remaining.toFixed(2)} ${sale.currency}</span>
+    <div class="total-row"><span>المجموع</span><span class="num">${sale.total_amount.toFixed(2)} ${sale.currency}</span></div>
+    <div class="total-row" style="color:#16a34a"><span>المدفوع</span><span class="num">${sale.amount_paid.toFixed(2)} ${sale.currency}</span></div>
+    <div class="total-row grand" style="color:${remaining > 0 ? '#dc2626' : '#16a34a'}">
+      <span>المتبقي</span><span class="num">${remaining.toFixed(2)} ${sale.currency}</span>
     </div>
-    ${sale.currency === 'USD' ? `<div class="total-line" style="color:#64748b;font-size:12px"><span>الإجمالي بالدينار</span><span>${Math.round(sale.total_amount * sale.exchange_rate).toLocaleString()} د.ع</span></div>` : ''}
   </div>
 
-  ${sale.note ? `<div style="margin-top:16px;padding:10px;background:#fef9c3;border-radius:6px;font-size:12px;color:#713f12"><strong>ملاحظة:</strong> ${sale.note}</div>` : ''}
+  ${sale.note ? `<div class="note-box"><strong>ملاحظة:</strong> ${sale.note}</div>` : ''}
+  ${instSection}
 
-  ${installmentsSection}
-</body>
-</html>`)
+  <div class="footer">
+    <span>نظام المحاسبة — غذائية وكهربائية</span>
+    <span>فاتورة #${sale.id.slice(0, 8).toUpperCase()} | ${date}</span>
+  </div>
+</div>`, `فاتورة #${sale.id.slice(0, 8).toUpperCase()}`)
 }
