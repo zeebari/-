@@ -320,9 +320,15 @@ export async function fetchInventory() {
   const { data, error } = await supabase
     .from('inventory')
     .select('*, products(*, categories(name))')
+    .is('deleted_at', null)
     .order('updated_at', { ascending: false })
   if (error) throw error
   return data ?? []
+}
+
+export async function deleteInventoryItem(id: string) {
+  const { error } = await supabase.from('inventory').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
 }
 
 export async function updateInventory(body: {

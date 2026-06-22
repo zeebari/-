@@ -7,11 +7,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { FileSpreadsheet, FileText, Pencil, AlertTriangle, Search } from 'lucide-react'
+import { FileSpreadsheet, FileText, Pencil, Trash2, AlertTriangle, Search } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Inventory } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
 import { IQD_RATE } from '@/lib/config'
-import { fetchInventory, updateInventory } from '@/lib/api'
+import { fetchInventory, updateInventory, deleteInventoryItem } from '@/lib/api'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<Inventory[]>([])
@@ -19,6 +20,8 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editTarget, setEditTarget] = useState<Inventory | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Inventory | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ quantity: '', min_quantity: '', warehouse_location: '', note: '' })
 
   useEffect(() => { loadData() }, [])
@@ -53,6 +56,15 @@ export default function InventoryPage() {
     await loadData()
     setEditTarget(null)
     setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteInventoryItem(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
   }
 
   async function exportExcel() {
@@ -133,7 +145,7 @@ export default function InventoryPage() {
                 <Th>سعر البيع د.ع</Th>
                 <Th>الحالة</Th>
                 <Th>الموقع</Th>
-                <Th>تعديل</Th>
+                <Th>إجراءات</Th>
               </tr>
             </Thead>
             <Tbody>
@@ -165,9 +177,14 @@ export default function InventoryPage() {
                     </Td>
                     <Td className="text-slate-500">{item.warehouse_location ?? '—'}</Td>
                     <Td>
-                      <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
-                        <Pencil size={15} />
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="تعديل">
+                          <Pencil size={15} />
+                        </button>
+                        <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </Td>
                   </Tr>
                 )
@@ -192,6 +209,14 @@ export default function InventoryPage() {
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف من المخزون"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.products?.name}" من المخزون؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }
