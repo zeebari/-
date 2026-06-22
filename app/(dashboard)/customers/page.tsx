@@ -1,0 +1,205 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { DashboardLayout } from '@/components/layout/DashboardLayout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Modal } from '@/components/ui/modal'
+import { Badge } from '@/components/ui/badge'
+import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
+import { Plus, Pencil, CreditCard, History } from 'lucide-react'
+import type { Customer, Sale } from '@/lib/types'
+import { formatCurrency } from '@/lib/currency'
+
+type ModalType = 'add' | 'edit' | 'payment' | 'history' | null
+
+export default function CustomersPage() {
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [sales, setSales] = useState<Sale[]>([])
+  const [rate, setRate] = useState(1310)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [modal, setModal] = useState<ModalType>(null)
+  const [selected, setSelected] = useState<Customer | null>(null)
+  const [form, setForm] = useState({ name: '', phone: '', address: '' })
+  const [payForm, setPayForm] = useState({ amount: '', currency: 'USD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] })
+
+  useEffect(() => { loadData() }, [])
+
+  async function loadData() {
+    setLoading(true)
+    const [custRes, rateRes] = await Promise.all([
+      fetch('/api/customers'),
+      fetch('/api/exchange-rate'),
+    ])
+    setCustomers(await custRes.json())
+    const rateData = await rateRes.json()
+    setRate(rateData.usd_to_iqd ?? 1310)
+    setLoading(false)
+  }
+
+  async function loadSales(customerId: string) {
+    const res = await fetch('/api/sales')
+    const all: Sale[] = await res.json()
+    setSales(all.filter(s => s.customer_id === customerId))
+  }
+
+  async function saveCustomer() {
+    if (!form.name) return
+    setSaving(true)
+    const url = selected ? `/api/customers/${selected.id}` : '/api/customers'
+    const method = selected ? 'PUT' : 'POST'
+    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    await loadData(); setModal(null); setSaving(false)
+  }
+
+  async function savePayment() {
+    if (!selected || !payForm.amount) return
+    setSaving(true)
+    await fetch('/api/customers/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customer_id: selected.id,
+        sale_id: payForm.sale_id || null,
+        amount: parseFloat(payForm.amount),
+        currency: payForm.currency,
+        exchange_rate: rate,
+        payment_date: payForm.payment_date,
+        note: payForm.note || null,
+      }),
+    })
+    await loadData(); setModal(null); setSaving(false)
+  }
+
+  const statusBadge = (status: string) => {
+    if (status === 'مدفوع') return <Badge variant="success">{status}</Badge>
+    if (status === 'جزئي') return <Badge variant="warning">{status}</Badge>
+    return <Badge variant="danger">{status}</Badge>
+  }
+
+  return (
+    <DashboardLayout
+      title="الزبائن"
+      headerActions={
+        <Button onClick={() => { setSelected(null); setForm({ name: '', phone: '', address: '' }); setModal('add') }}>
+          <Plus size={16} />إضافة زبون
+        </Button>
+      }
+    >
+      <div className="card p-0">
+        <Table>
+          <Thead>
+            <tr>
+              <Th>الزبون</Th>
+              <Th>الهاتف</Th>
+              <Th>رصيد الدين</Th>
+              <Th>بالدينار</Th>
+              <Th>إجراءات</Th>
+            </tr>
+          </Thead>
+          <Tbody>
+            {loading ? (
+              <Tr><Td className="text-center py-8 text-slate-400" colSpan={5}>جاري التحميل...</Td></Tr>
+            ) : customers.length === 0 ? (
+              <Tr><Td className="text-center py-8 text-slate-400" colSpan={5}>لا يوجد زبائن</Td></Tr>
+            ) : customers.map(c => (
+              <Tr key={c.id}>
+                <Td>
+                  <div className="font-medium text-slate-900">{c.name}</div>
+                  {c.address && <div className="text-xs text-slate-400">{c.address}</div>}
+                </Td>
+                <Td>{c.phone ?? '—'}</Td>
+                <Td className={c.balance_owed > 0 ? 'font-semibold text-red-600' : 'text-green-600'}>
+                  {formatCurrency(c.balance_owed, 'USD')}
+                </Td>
+                <Td className="text-slate-500">{formatCurrency(c.balance_owed * rate, 'IQD')}</Td>
+                <Td>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setSelected(c); setForm({ name: c.name, phone: c.phone ?? '', address: c.address ?? '' }); setModal('edit') }}
+                      className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="تعديل">
+                      <Pencil size={14} />
+                    </button>
+                    <button onClick={() => { setSelected(c); setPayForm({ amount: '', currency: 'USD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] }); setModal('payment') }}
+                      className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="تسجيل دفعة">
+                      <CreditCard size={14} />
+                    </button>
+                    <button onClick={() => { setSelected(c); loadSales(c.id); setModal('history') }}
+                      className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" title="السجل">
+                      <History size={14} />
+                    </button>
+                  </div>
+                </Td>
+              </Tr>
+            ))}
+          </Tbody>
+        </Table>
+      </div>
+
+      {/* Add/Edit */}
+      <Modal open={modal === 'add' || modal === 'edit'} onClose={() => setModal(null)} title={modal === 'edit' ? 'تعديل زبون' : 'إضافة زبون'} size="sm">
+        <div className="space-y-4">
+          <Input label="اسم الزبون *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="الاسم الكامل" />
+          <Input label="رقم الهاتف" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="+964..." />
+          <Textarea label="العنوان" value={form.address} onChange={e => setForm(f => ({ ...f, address: e.target.value }))} />
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setModal(null)}>إلغاء</Button>
+            <Button onClick={saveCustomer} loading={saving}>{modal === 'edit' ? 'حفظ' : 'إضافة'}</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Payment */}
+      <Modal open={modal === 'payment'} onClose={() => setModal(null)} title={`تسجيل دفعة — ${selected?.name}`} size="sm">
+        <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
+            رصيد الدين: <strong>{formatCurrency(selected?.balance_owed ?? 0, 'USD')}</strong>
+            <span className="text-xs mr-1">= {formatCurrency((selected?.balance_owed ?? 0) * rate, 'IQD')}</span>
+          </div>
+          <Input label="المبلغ المدفوع *" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-sm font-medium text-slate-700">العملة</label>
+              <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={payForm.currency} onChange={e => setPayForm(f => ({ ...f, currency: e.target.value }))}>
+                <option value="USD">دولار</option>
+                <option value="IQD">دينار</option>
+              </select>
+            </div>
+            <Input label="التاريخ" type="date" value={payForm.payment_date} onChange={e => setPayForm(f => ({ ...f, payment_date: e.target.value }))} />
+          </div>
+          <Textarea label="ملاحظة" value={payForm.note} onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))} />
+          <div className="flex gap-3 justify-end">
+            <Button variant="outline" onClick={() => setModal(null)}>إلغاء</Button>
+            <Button onClick={savePayment} loading={saving}>تسجيل الدفعة</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* History */}
+      <Modal open={modal === 'history'} onClose={() => setModal(null)} title={`سجل مبيعات — ${selected?.name}`} size="lg">
+        <div className="space-y-3">
+          {sales.length === 0 ? (
+            <p className="text-center text-slate-400 py-8">لا توجد مبيعات لهذا الزبون</p>
+          ) : sales.map(s => (
+            <div key={s.id} className="border border-slate-200 rounded-lg p-4">
+              <div className="flex justify-between items-start mb-2">
+                <div>
+                  <span className="font-medium">{s.sale_date}</span>
+                  <span className="text-slate-500 text-xs mr-2">#{s.id.slice(0, 8).toUpperCase()}</span>
+                  <Badge variant="info" className="mr-2">{s.payment_type}</Badge>
+                </div>
+                {statusBadge(s.status)}
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm text-slate-600">
+                <div>المجموع: <strong>{s.total_amount.toFixed(2)} {s.currency}</strong></div>
+                <div>المدفوع: <strong className="text-green-600">{s.amount_paid.toFixed(2)} {s.currency}</strong></div>
+                <div>المتبقي: <strong className="text-red-600">{(s.total_amount - s.amount_paid).toFixed(2)} {s.currency}</strong></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Modal>
+    </DashboardLayout>
+  )
+}
