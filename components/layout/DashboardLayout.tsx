@@ -1,10 +1,9 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Sidebar } from './Sidebar'
 import { Header } from './Header'
-
-const BACKUP_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
-const LAST_BACKUP_KEY = 'last_telegram_backup'
+import { useAuth } from '@/lib/auth'
 
 interface DashboardLayoutProps {
   title: string
@@ -14,40 +13,24 @@ interface DashboardLayoutProps {
 
 export function DashboardLayout({ title, children, headerActions }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const backupRef = useRef(false)
+  const { user, loading } = useAuth()
+  const router = useRouter()
 
   useEffect(() => {
-    async function runBackup() {
-      if (backupRef.current) return
-      backupRef.current = true
-      try {
-        const { sendBackupToTelegram } = await import('@/lib/telegram')
-        await sendBackupToTelegram()
-        localStorage.setItem(LAST_BACKUP_KEY, Date.now().toString())
-      } catch {
-        // silent — backup failure shouldn't break the app
-      } finally {
-        backupRef.current = false
-      }
+    if (!loading && !user) {
+      router.replace('/login')
     }
+  }, [loading, user, router])
 
-    function scheduleBackup() {
-      const last = parseInt(localStorage.getItem(LAST_BACKUP_KEY) ?? '0', 10)
-      const elapsed = Date.now() - last
-      const delay = elapsed >= BACKUP_INTERVAL_MS ? 0 : BACKUP_INTERVAL_MS - elapsed
-      return setTimeout(() => {
-        runBackup()
-        intervalId = setInterval(runBackup, BACKUP_INTERVAL_MS)
-      }, delay)
-    }
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-slate-400 text-sm">جاري التحميل...</div>
+      </div>
+    )
+  }
 
-    let intervalId: ReturnType<typeof setInterval>
-    const timeoutId = scheduleBackup()
-    return () => {
-      clearTimeout(timeoutId)
-      clearInterval(intervalId)
-    }
-  }, [])
+  if (!user) return null
 
   return (
     <div className="min-h-screen bg-slate-50">

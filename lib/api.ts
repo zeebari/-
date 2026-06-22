@@ -1,5 +1,40 @@
 import { supabase } from './supabase'
 
+const FUNCTIONS_URL = process.env.NEXT_PUBLIC_SUPABASE_URL + '/functions/v1'
+
+async function callEdgeFn(path: string, options: RequestInit = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch(`${FUNCTIONS_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session?.access_token}`,
+      ...(options.headers as Record<string, string> ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error ?? 'خطأ في الاتصال')
+  }
+  return res.json()
+}
+
+export async function listUsers() {
+  return callEdgeFn('/manage-users')
+}
+
+export async function createUser(body: { email: string; password: string; name: string; role: string }) {
+  return callEdgeFn('/manage-users', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function deleteUser(id: string) {
+  return callEdgeFn('/manage-users', { method: 'DELETE', body: JSON.stringify({ id }) })
+}
+
+export async function updateUserRole(id: string, role: string, name?: string) {
+  return callEdgeFn('/manage-users', { method: 'PATCH', body: JSON.stringify({ id, role, name }) })
+}
+
 export async function fetchExchangeRate(): Promise<{ usd_to_iqd: number; rate_date: string }> {
   const { data } = await supabase
     .from('exchange_rates')
