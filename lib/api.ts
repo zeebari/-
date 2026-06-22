@@ -19,6 +19,18 @@ async function callEdgeFn(path: string, options: RequestInit = {}) {
   return res.json()
 }
 
+export async function listOrganizations() {
+  return callEdgeFn('/manage-orgs')
+}
+
+export async function createOrganization(body: { name: string; adminEmail: string; adminPassword: string; adminName: string }) {
+  return callEdgeFn('/manage-orgs', { method: 'POST', body: JSON.stringify(body) })
+}
+
+export async function toggleOrganization(org_id: string, active: boolean) {
+  return callEdgeFn('/manage-orgs', { method: 'PATCH', body: JSON.stringify({ org_id, active }) })
+}
+
 export async function listUsers() {
   return callEdgeFn('/manage-users')
 }

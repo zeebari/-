@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Package, Warehouse, Truck, Users, ShoppingCart,
-  BarChart3, Settings, X, Receipt, UserCog, LogOut,
+  BarChart3, Settings, X, Receipt, UserCog, LogOut, Building2,
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth'
 
@@ -100,6 +100,23 @@ export function Sidebar({ open, onClose }: SidebarProps) {
                 >
                   <UserCog size={18} />
                   إدارة المستخدمين
+                </Link>
+              </li>
+            )}
+            {user?.is_super_admin && (
+              <li>
+                <Link
+                  href="/organizations"
+                  onClick={onClose}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                    pathname === '/organizations'
+                      ? 'bg-purple-600 text-white'
+                      : 'text-slate-300 hover:bg-slate-700 hover:text-white'
+                  )}
+                >
+                  <Building2 size={18} />
+                  إدارة المنظمات
                 </Link>
               </li>
             )}

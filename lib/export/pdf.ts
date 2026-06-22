@@ -14,6 +14,25 @@ body {
   font-size: 13px;
   line-height: 1.5;
 }
+.back-btn {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-family: 'Tajawal', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 9999;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  transition: background 0.15s;
+}
+.back-btn:hover { background: #1d4ed8; }
+@media print { .back-btn { display: none !important; } }
 .page { padding: 32px 36px; min-height: 100vh; display: flex; flex-direction: column; }
 .header {
   display: flex; justify-content: space-between; align-items: center;
@@ -74,7 +93,10 @@ function open(html: string, title: string) {
   <title>${title}</title>
   <style>${BASE}</style>
 </head>
-<body>${html}</body>
+<body>
+<button class="back-btn" onclick="window.close()">✕ إغلاق</button>
+${html}
+</body>
 </html>`)
   win.document.close()
   win.onload = () => { win.focus(); win.print() }

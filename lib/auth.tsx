@@ -10,6 +10,8 @@ export interface AuthUser {
   email: string
   name: string
   role: Role
+  is_super_admin: boolean
+  org_id: string | null
 }
 
 interface AuthCtx {
@@ -31,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function loadProfile(authUser: User) {
     const { data } = await supabase
       .from('user_profiles')
-      .select('name, role')
+      .select('name, role, is_super_admin, org_id')
       .eq('id', authUser.id)
       .single()
     setUser({
@@ -39,6 +41,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: authUser.email ?? '',
       name: data?.name ?? authUser.email ?? '',
       role: (data?.role ?? 'viewer') as Role,
+      is_super_admin: data?.is_super_admin ?? false,
+      org_id: data?.org_id ?? null,
     })
     setLoading(false)
   }
