@@ -168,7 +168,7 @@ export default function SuppliersPage() {
                       className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="إضافة فاتورة شراء">
                       <ShoppingBag size={14} />
                     </button>
-                    <button onClick={() => { setSelected(s); setPayForm({ amount: '', currency: s.currency, note: '', purchase_order_id: '', payment_date: new Date().toISOString().split('T')[0] }); setModal('payment') }}
+                    <button onClick={() => { setSelected(s); setPayForm({ amount: '', currency: s.currency, note: '', purchase_order_id: '', payment_date: new Date().toISOString().split('T')[0] }); setOrders([]); loadOrders(s.id); setModal('payment') }}
                       className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-600" title="تسجيل دفعة">
                       <CreditCard size={14} />
                     </button>
@@ -291,6 +291,23 @@ export default function SuppliersPage() {
           <Input label="المبلغ المدفوع *" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
           <Select label="العملة" value={payForm.currency} onChange={e => setPayForm(f => ({ ...f, currency: e.target.value }))}
             options={[{ value: 'USD', label: 'دولار' }, { value: 'IQD', label: 'دينار' }]} />
+          {orders.filter(o => o.status !== 'مدفوع').length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">تطبيق على فاتورة (اختياري)</label>
+              <select
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={payForm.purchase_order_id}
+                onChange={e => setPayForm(f => ({ ...f, purchase_order_id: e.target.value }))}
+              >
+                <option value="">— دفعة عامة على الحساب —</option>
+                {orders.filter(o => o.status !== 'مدفوع').map(o => (
+                  <option key={o.id} value={o.id}>
+                    {o.order_date} — {formatCurrency(o.total_amount - o.amount_paid, o.currency as 'USD' | 'IQD')} متبقي
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <Input label="التاريخ" type="date" value={payForm.payment_date} onChange={e => setPayForm(f => ({ ...f, payment_date: e.target.value }))} />
           <Textarea label="ملاحظة" value={payForm.note} onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))} placeholder="ملاحظة اختيارية" />
           <div className="flex gap-3 justify-end">

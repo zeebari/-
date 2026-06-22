@@ -70,10 +70,10 @@ export default function ExpensesPage() {
   }
 
   const toIQD = (e: Expense) =>
-    e.currency === 'IQD' ? e.amount : e.amount * e.exchange_rate
+    e.currency === 'IQD' ? e.amount : e.amount * IQD_RATE
 
   const toUSD = (e: Expense) =>
-    e.currency === 'USD' ? e.amount : e.amount / e.exchange_rate
+    e.currency === 'USD' ? e.amount : e.amount / IQD_RATE
 
   const totalIQD = expenses.reduce((s, e) => s + toIQD(e), 0)
   const totalUSD = expenses.reduce((s, e) => s + toUSD(e), 0)
