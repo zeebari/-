@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
-  LayoutDashboard, Package, Warehouse, Truck, Users, ShoppingCart, BarChart3, Settings, X
+  LayoutDashboard, Package, Warehouse, Truck, Users, ShoppingCart, BarChart3, Settings, X, Receipt
 } from 'lucide-react'
 
 const navItems = [
@@ -13,6 +13,7 @@ const navItems = [
   { href: '/suppliers', label: 'الموردون', icon: Truck },
   { href: '/customers', label: 'الزبائن', icon: Users },
   { href: '/sales', label: 'المبيعات', icon: ShoppingCart },
+  { href: '/expenses', label: 'المصاريف', icon: Receipt },
   { href: '/reports', label: 'التقارير', icon: BarChart3 },
   { href: '/settings', label: 'الإعدادات', icon: Settings },
 ]

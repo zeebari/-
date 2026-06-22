@@ -359,3 +359,46 @@ export async function fetchDebtsReport() {
   ])
   return { customers: customers.data ?? [], suppliers: suppliers.data ?? [] }
 }
+
+export interface Expense {
+  id: string
+  category: string
+  description: string
+  amount: number
+  currency: 'USD' | 'IQD'
+  exchange_rate: number
+  expense_date: string
+  note?: string
+  created_at: string
+}
+
+export async function fetchExpenses(from?: string, to?: string) {
+  let query = supabase
+    .from('expenses')
+    .select('*')
+    .order('expense_date', { ascending: false })
+  if (from) query = query.gte('expense_date', from)
+  if (to) query = query.lte('expense_date', to)
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []) as Expense[]
+}
+
+export async function createExpense(body: {
+  category: string
+  description: string
+  amount: number
+  currency: 'USD' | 'IQD'
+  exchange_rate: number
+  expense_date: string
+  note?: string
+}) {
+  const { data, error } = await supabase.from('expenses').insert(body).select().single()
+  if (error) throw error
+  return data as Expense
+}
+
+export async function deleteExpense(id: string) {
+  const { error } = await supabase.from('expenses').delete().eq('id', id)
+  if (error) throw error
+}
