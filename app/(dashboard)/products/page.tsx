@@ -12,8 +12,9 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 import type { Product, Category } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
 import {
-  fetchProducts, fetchCategories, fetchExchangeRate,
+  fetchProducts, fetchCategories,
   createProduct, updateProduct, deleteProduct,
 } from '@/lib/api'
 
@@ -22,8 +23,8 @@ const UNITS = ['قطعة', 'كيلو', 'لتر', 'علبة', 'كارتون', 'م
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [rate, setRate] = useState(1310)
   const [search, setSearch] = useState('')
+  const [priceCurrency, setPriceCurrency] = useState<'USD' | 'IQD'>('USD')
   const [filterCat, setFilterCat] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -40,21 +41,22 @@ export default function ProductsPage() {
 
   async function loadData() {
     setLoading(true)
-    const [prods, cats, rateData] = await Promise.all([fetchProducts(), fetchCategories(), fetchExchangeRate()])
+    const [prods, cats] = await Promise.all([fetchProducts(), fetchCategories()])
     setProducts(prods as Product[])
     setCategories(cats as Category[])
-    setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
   function openAdd() {
     setEditTarget(null)
+    setPriceCurrency('USD')
     setForm({ name: '', category_id: '', unit: 'قطعة', cost_price_usd: '', sale_price_usd: '', barcode: '', description: '' })
     setModalOpen(true)
   }
 
   function openEdit(p: Product) {
     setEditTarget(p)
+    setPriceCurrency('USD')
     setForm({
       name: p.name,
       category_id: p.category_id ?? '',
@@ -70,12 +72,15 @@ export default function ProductsPage() {
   async function handleSave() {
     if (!form.name || !form.sale_price_usd) return
     setSaving(true)
+    const toUSD = (v: string) => priceCurrency === 'IQD'
+      ? (parseFloat(v) || 0) / IQD_RATE
+      : parseFloat(v) || 0
     const payload = {
       name: form.name,
       category_id: form.category_id || null,
       unit: form.unit,
-      cost_price_usd: parseFloat(form.cost_price_usd) || 0,
-      sale_price_usd: parseFloat(form.sale_price_usd) || 0,
+      cost_price_usd: toUSD(form.cost_price_usd),
+      sale_price_usd: toUSD(form.sale_price_usd),
       barcode: form.barcode || null,
       description: form.description || null,
     }
@@ -163,7 +168,7 @@ export default function ProductsPage() {
                   <Td>{p.unit}</Td>
                   <Td>{formatCurrency(p.cost_price_usd, 'USD')}</Td>
                   <Td className="font-medium text-green-700">{formatCurrency(p.sale_price_usd, 'USD')}</Td>
-                  <Td className="text-slate-500">{formatCurrency(p.sale_price_usd * rate, 'IQD')}</Td>
+                  <Td className="text-slate-500">{formatCurrency(p.sale_price_usd * IQD_RATE, 'IQD')}</Td>
                   <Td>
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
@@ -200,13 +205,40 @@ export default function ProductsPage() {
               options={UNITS.map(u => ({ value: u, label: u }))}
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">عملة الأسعار</label>
+            <div className="flex gap-2 mb-3">
+              {(['USD', 'IQD'] as const).map(cur => (
+                <button key={cur} type="button"
+                  onClick={() => setPriceCurrency(cur)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${priceCurrency === cur ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>
+                  {cur === 'USD' ? 'دولار ($)' : 'دينار (د.ع)'}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="سعر التكلفة ($)" type="number" step="0.01" value={form.cost_price_usd} onChange={e => setForm(f => ({ ...f, cost_price_usd: e.target.value }))} placeholder="0.00" />
-            <Input label="سعر البيع ($) *" type="number" step="0.01" value={form.sale_price_usd} onChange={e => setForm(f => ({ ...f, sale_price_usd: e.target.value }))} placeholder="0.00" />
+            <Input
+              label={`سعر التكلفة (${priceCurrency === 'USD' ? '$' : 'د.ع'})`}
+              type="number" step={priceCurrency === 'USD' ? '0.01' : '1'}
+              value={form.cost_price_usd}
+              onChange={e => setForm(f => ({ ...f, cost_price_usd: e.target.value }))}
+              placeholder="0"
+            />
+            <Input
+              label={`سعر البيع (${priceCurrency === 'USD' ? '$' : 'د.ع'}) *`}
+              type="number" step={priceCurrency === 'USD' ? '0.01' : '1'}
+              value={form.sale_price_usd}
+              onChange={e => setForm(f => ({ ...f, sale_price_usd: e.target.value }))}
+              placeholder="0"
+            />
           </div>
           {form.sale_price_usd && (
             <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded-lg">
-              سعر البيع بالدينار: <strong>{(parseFloat(form.sale_price_usd || '0') * rate).toLocaleString()} د.ع</strong>
+              {priceCurrency === 'USD'
+                ? <>سعر البيع بالدينار: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString()} د.ع</strong></>
+                : <>سعر البيع بالدولار: <strong>${(parseFloat(form.sale_price_usd || '0') / IQD_RATE).toFixed(2)}</strong></>
+              }
             </div>
           )}
           <Input label="الباركود" value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} placeholder="اختياري" />
