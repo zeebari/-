@@ -158,6 +158,35 @@ export async function fetchSales() {
 
 export async function deleteSale(id: string) {
   const now = new Date().toISOString()
+
+  const [{ data: sale }, { data: saleItems }] = await Promise.all([
+    supabase.from('sales').select('customer_id, total_amount, amount_paid, currency, exchange_rate, status').eq('id', id).single(),
+    supabase.from('sale_items').select('product_id, quantity').eq('sale_id', id).is('deleted_at', null),
+  ])
+
+  // Restore inventory quantities
+  if (saleItems && saleItems.length > 0) {
+    for (const item of saleItems) {
+      const { data: inv } = await supabase.from('inventory').select('quantity').eq('product_id', item.product_id).single()
+      await supabase.from('inventory').update({ quantity: (inv?.quantity ?? 0) + item.quantity, updated_at: now }).eq('product_id', item.product_id)
+      await supabase.from('inventory_transactions').insert({
+        product_id: item.product_id,
+        type: 'إدخال',
+        quantity: item.quantity,
+        reference_type: 'إلغاء بيع',
+        reference_id: id,
+      })
+    }
+  }
+
+  // Deduct outstanding debt from customer balance (stored in USD)
+  if (sale?.customer_id && sale.status !== 'مدفوع') {
+    const outstanding = sale.total_amount - sale.amount_paid
+    const outstandingUSD = sale.currency === 'USD' ? outstanding : outstanding / (sale.exchange_rate || 1310)
+    const { data: cust } = await supabase.from('customers').select('balance_owed').eq('id', sale.customer_id).single()
+    await supabase.from('customers').update({ balance_owed: Math.max(0, (cust?.balance_owed ?? 0) - outstandingUSD) }).eq('id', sale.customer_id)
+  }
+
   await Promise.all([
     supabase.from('sales').update({ deleted_at: now }).eq('id', id),
     supabase.from('sale_items').update({ deleted_at: now }).eq('sale_id', id),
@@ -541,8 +570,9 @@ export async function fetchNotifications(): Promise<{
       .is('deleted_at', null),
     supabase
       .from('installments')
-      .select('id, due_date, amount, sales(currency, exchange_rate, customers(name, phone))')
+      .select('id, due_date, amount, sales!inner(currency, exchange_rate, deleted_at, customers(name, phone))')
       .eq('status', 'معلق')
+      .is('sales.deleted_at', null)
       .gte('due_date', today)
       .lte('due_date', nextWeek)
       .order('due_date')
