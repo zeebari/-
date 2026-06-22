@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, Send } from 'lucide-react'
+import { CheckCircle, Send, Wallet } from 'lucide-react'
 import { fetchCategories, createCategory } from '@/lib/api'
 
 export default function SettingsPage() {
@@ -13,12 +13,22 @@ export default function SettingsPage() {
   const [backupSending, setBackupSending] = useState(false)
   const [backupStatus, setBackupStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [lastBackup, setLastBackup] = useState<string | null>(null)
+  const [capital, setCapital] = useState('')
+  const [capitalSaved, setCapitalSaved] = useState(false)
 
   useEffect(() => {
     const ts = localStorage.getItem('last_telegram_backup')
     if (ts) setLastBackup(new Date(parseInt(ts, 10)).toLocaleString('ar-IQ'))
+    const saved = localStorage.getItem('initial_capital_usd')
+    if (saved) setCapital(saved)
     fetchCategories().then(cats => setCategories(cats as { id: string; name: string }[]))
   }, [])
+
+  function saveCapital() {
+    localStorage.setItem('initial_capital_usd', capital)
+    setCapitalSaved(true)
+    setTimeout(() => setCapitalSaved(false), 2000)
+  }
 
   async function sendBackupNow() {
     setBackupSending(true)
@@ -48,6 +58,31 @@ export default function SettingsPage() {
   return (
     <DashboardLayout title="الإعدادات">
       <div className="max-w-2xl space-y-6">
+
+        {/* Capital */}
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2">
+            <Wallet size={18} className="text-blue-600" />
+            <h2 className="text-base font-semibold text-slate-800">رأس المال الأولي</h2>
+          </div>
+          <p className="text-sm text-slate-500">أدخل رأس المال الذي استثمرته في المشروع لحساب الصافي والمبلغ المداور في لوحة التحكم</p>
+          <div className="flex gap-3 items-end">
+            <Input
+              label="رأس المال ($)"
+              type="number"
+              step="0.01"
+              value={capital}
+              onChange={e => setCapital(e.target.value)}
+              placeholder="0.00"
+              className="flex-1"
+            />
+            <Button onClick={saveCapital} variant="secondary">حفظ</Button>
+          </div>
+          {capitalSaved && (
+            <span className="text-green-600 text-sm flex items-center gap-1"><CheckCircle size={14} />تم الحفظ</span>
+          )}
+        </div>
+
         {/* Categories */}
         <div className="card space-y-4">
           <h2 className="text-base font-semibold text-slate-800">فئات المنتجات</h2>
