@@ -20,7 +20,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const ts = localStorage.getItem('last_telegram_backup')
-    if (ts) setLastBackup(new Date(parseInt(ts, 10)).toLocaleString('ar-IQ'))
+    if (ts) setLastBackup(new Date(parseInt(ts, 10)).toLocaleString('en-US'))
     const saved = localStorage.getItem('initial_capital_usd')
     if (saved) setCapital(saved)
     fetchCategories().then(cats => setCategories(cats as { id: string; name: string }[]))
@@ -37,7 +37,7 @@ export default function SettingsPage() {
 
   const capitalPreview = capital
     ? capitalCurrency === 'USD'
-      ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString()} د.ع`
+      ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع`
       : `= $${((parseFloat(capital) || 0) / IQD_RATE).toFixed(2)}`
     : null
 
@@ -49,7 +49,7 @@ export default function SettingsPage() {
       await sendBackupToTelegram()
       const now = Date.now()
       localStorage.setItem('last_telegram_backup', now.toString())
-      setLastBackup(new Date(now).toLocaleString('ar-IQ'))
+      setLastBackup(new Date(now).toLocaleString('en-US'))
       setBackupStatus('ok')
     } catch {
       setBackupStatus('err')

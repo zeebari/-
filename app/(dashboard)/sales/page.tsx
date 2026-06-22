@@ -301,7 +301,7 @@ export default function SalesPage() {
 
           <div className="bg-blue-50 rounded-lg p-4 text-right">
             <div className="text-2xl font-bold text-blue-700">المجموع: {subtotal.toFixed(2)} {currency}</div>
-            {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * IQD_RATE).toLocaleString()} د.ع</div>}
+            {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</div>}
           </div>
 
           {paymentType === 'نقد' && (
@@ -391,7 +391,7 @@ export default function SalesPage() {
               {detailSale.currency === 'USD' && (
                 <div className="flex justify-between text-slate-500 text-xs pt-1 border-t border-slate-200">
                   <span>المجموع بالدينار:</span>
-                  <strong>{(detailSale.total_amount * IQD_RATE).toLocaleString()} د.ع</strong>
+                  <strong>{(detailSale.total_amount * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</strong>
                 </div>
               )}
             </div>

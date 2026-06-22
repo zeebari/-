@@ -102,7 +102,7 @@ export async function sendBackupToTelegram(): Promise<void> {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   })
 
-  const now = new Date().toLocaleString('ar-IQ', { timeZone: 'Asia/Baghdad' })
+  const now = new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' })
   const filename = `backup-${new Date().toISOString().slice(0, 10)}.xlsx`
 
   const form = new FormData()

@@ -246,7 +246,7 @@ export default function SuppliersPage() {
             </Button>
             <div className="text-lg font-bold text-slate-900">
               المجموع: {orderTotal().toFixed(2)} {orderCurrency}
-              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * IQD_RATE).toLocaleString()} د.ع</span>}
+              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</span>}
             </div>
           </div>
 

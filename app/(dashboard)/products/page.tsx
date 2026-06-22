@@ -240,7 +240,7 @@ export default function ProductsPage() {
           {form.sale_price_usd && (
             <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded-lg">
               {priceCurrency === 'USD'
-                ? <>المعادل: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString()} د.ع</strong></>
+                ? <>المعادل: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</strong></>
                 : <>المعادل: <strong>${(parseFloat(form.sale_price_usd || '0') / IQD_RATE).toFixed(2)}</strong></>
               }
             </div>

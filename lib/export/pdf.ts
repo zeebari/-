@@ -88,7 +88,7 @@ export async function exportInventoryToPdf(
   }[],
   _rate?: number
 ) {
-  const date = new Date().toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
+  const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const lowCount = items.filter(i => i.quantity <= i.min_quantity).length
 
   const rows = items.map(i => {
@@ -146,7 +146,7 @@ export async function exportSaleToPdf(sale: {
 }) {
   const remaining = sale.total_amount - sale.amount_paid
   const statusColor = sale.status === 'مدفوع' ? '#16a34a' : sale.status === 'جزئي' ? '#d97706' : '#dc2626'
-  const date = new Date(sale.sale_date).toLocaleDateString('ar-IQ', { year: 'numeric', month: 'long', day: 'numeric' })
+  const date = new Date(sale.sale_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
 
   const itemRows = sale.items.map(i => `<tr>
     <td>${i.product_name}</td>
@@ -157,7 +157,7 @@ export async function exportSaleToPdf(sale: {
 
   const instRows = (sale.installments ?? []).map((inst, i) => `<tr>
     <td>قسط ${i + 1}</td>
-    <td>${new Date(inst.due_date).toLocaleDateString('ar-IQ')}</td>
+    <td>${new Date(inst.due_date).toLocaleDateString('en-US')}</td>
     <td class="num">${inst.amount.toFixed(2)} ${sale.currency}</td>
     <td class="${inst.status === 'مدفوع' ? 'ok' : 'low'}">${inst.status}</td>
   </tr>`).join('')
