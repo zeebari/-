@@ -11,7 +11,7 @@ async function buildBackupWorkbook() {
     supabase.from('products').select('*, categories(name)').is('deleted_at', null).order('created_at'),
     supabase.from('inventory').select('*, products(name)').is('deleted_at', null).order('updated_at', { ascending: false }),
     supabase.from('sales').select('*, customers(name)').is('deleted_at', null).order('sale_date', { ascending: false }),
-    supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
+    supabase.from('expenses').select('*').is('deleted_at', null).order('expense_date', { ascending: false }),
   ])
 
   const wb = XLSX.utils.book_new()

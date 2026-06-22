@@ -157,7 +157,7 @@ export default function CustomersPage() {
                       className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="تعديل">
                       <Pencil size={14} />
                     </button>
-                    <button onClick={() => { setSelected(c); setPayForm({ amount: '', currency: 'IQD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] }); setModal('payment') }}
+                    <button onClick={() => { setSelected(c); setPayForm({ amount: '', currency: 'IQD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] }); setSales([]); loadSales(c.id); setModal('payment') }}
                       className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="تسجيل دفعة">
                       <CreditCard size={14} />
                     </button>
@@ -237,6 +237,23 @@ export default function CustomersPage() {
             رصيد الدين: <strong>{formatCurrency((selected?.balance_owed ?? 0) * IQD_RATE, 'IQD')}</strong>
             <span className="text-xs mr-1">({formatCurrency(selected?.balance_owed ?? 0, 'USD')})</span>
           </div>
+          {sales.filter(s => s.status !== 'مدفوع').length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">تطبيق على فاتورة (اختياري)</label>
+              <select
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={payForm.sale_id}
+                onChange={e => setPayForm(f => ({ ...f, sale_id: e.target.value }))}
+              >
+                <option value="">— دفعة عامة على الحساب —</option>
+                {sales.filter(s => s.status !== 'مدفوع').map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.sale_date} — {formatCurrency(s.total_amount - s.amount_paid, s.currency as 'USD' | 'IQD')} متبقي
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <Input label="المبلغ المدفوع *" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
