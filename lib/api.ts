@@ -102,8 +102,11 @@ export async function fetchSales() {
 }
 
 export async function deleteSale(id: string) {
-  const { error } = await supabase.from('sales').update({ deleted_at: new Date().toISOString() }).eq('id', id)
-  if (error) throw error
+  const now = new Date().toISOString()
+  await Promise.all([
+    supabase.from('sales').update({ deleted_at: now }).eq('id', id),
+    supabase.from('sale_items').update({ deleted_at: now }).eq('sale_id', id),
+  ])
 }
 
 export async function createSale(body: {
@@ -365,11 +368,11 @@ export async function fetchDashboardStats() {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
 
   const [todaySales, monthSales, customerDebt, supplierDebt, lowStock] = await Promise.all([
-    supabase.from('sales').select('total_amount, currency, exchange_rate').eq('sale_date', today),
-    supabase.from('sales').select('total_amount, currency, exchange_rate').gte('sale_date', monthStart),
-    supabase.from('customers').select('balance_owed').gt('balance_owed', 0),
-    supabase.from('suppliers').select('balance_owed').gt('balance_owed', 0),
-    supabase.from('inventory').select('quantity, min_quantity').filter('quantity', 'lte', 'min_quantity'),
+    supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null).eq('sale_date', today),
+    supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null).gte('sale_date', monthStart),
+    supabase.from('customers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
+    supabase.from('suppliers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
+    supabase.from('inventory').select('quantity, min_quantity').is('deleted_at', null).filter('quantity', 'lte', 'min_quantity'),
   ])
 
   const sumUSD = (rows: { total_amount: number; currency: string; exchange_rate: number }[]) =>
@@ -451,12 +454,12 @@ export async function deleteExpense(id: string) {
 export async function fetchFinancialSummary() {
   const IQD_RATE = 1310
   const [sales, saleItems, expenses, inventory, customers, suppliers] = await Promise.all([
-    supabase.from('sales').select('total_amount, currency, exchange_rate'),
-    supabase.from('sale_items').select('quantity, products(cost_price_usd, price_currency)'),
-    supabase.from('expenses').select('amount, currency, exchange_rate'),
-    supabase.from('inventory').select('quantity, products(cost_price_usd, price_currency)'),
-    supabase.from('customers').select('balance_owed').gt('balance_owed', 0),
-    supabase.from('suppliers').select('balance_owed, currency').gt('balance_owed', 0),
+    supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null),
+    supabase.from('sale_items').select('quantity, products(cost_price_usd, price_currency)').is('deleted_at', null),
+    supabase.from('expenses').select('amount, currency, exchange_rate').is('deleted_at', null),
+    supabase.from('inventory').select('quantity, products(cost_price_usd, price_currency)').is('deleted_at', null),
+    supabase.from('customers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
+    supabase.from('suppliers').select('balance_owed, currency').is('deleted_at', null).gt('balance_owed', 0),
   ])
 
   const toUSD = (amount: number, currency: string, rate: number) =>
