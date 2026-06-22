@@ -8,6 +8,7 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { FileSpreadsheet, FileText, BarChart3 } from 'lucide-react'
 import type { Sale, Customer, Supplier } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { fetchExchangeRate, fetchSalesReport, fetchDebtsReport, fetchInventory } from '@/lib/api'
 
 type Tab = 'sales' | 'debts' | 'inventory'
 
@@ -29,21 +30,21 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/exchange-rate').then(r => r.json()).then(d => setRate(d.usd_to_iqd ?? 1310))
+    fetchExchangeRate().then(d => setRate(d.usd_to_iqd ?? 1310))
     loadSales()
     loadDebts()
   }, [])
 
   async function loadSales() {
     setLoading(true)
-    const res = await fetch(`/api/reports?type=sales&from=${from}&to=${to}`)
-    setSales(await res.json())
+    const data = await fetchSalesReport(from, to)
+    setSales(data as Sale[])
     setLoading(false)
   }
 
   async function loadDebts() {
-    const res = await fetch('/api/reports?type=debts')
-    setDebts(await res.json())
+    const data = await fetchDebtsReport()
+    setDebts(data as DebtData)
   }
 
   const totalSalesUSD = sales.reduce((s, sale) =>
@@ -68,8 +69,7 @@ export default function ReportsPage() {
   }
 
   async function exportInventoryReport() {
-    const [invRes] = await Promise.all([fetch('/api/inventory')])
-    const inventory = await invRes.json()
+    const inventory = await fetchInventory()
     const { exportInventoryToExcel } = await import('@/lib/export/excel')
     exportInventoryToExcel(inventory.map((i: { products?: { name?: string; categories?: { name?: string }; unit?: string; cost_price_usd?: number; sale_price_usd?: number }; quantity: number; min_quantity: number; warehouse_location?: string }) => ({
       المنتج: i.products?.name ?? '',
@@ -81,6 +81,20 @@ export default function ReportsPage() {
       'سعر البيع $': i.products?.sale_price_usd ?? 0,
       الموقع: i.warehouse_location ?? '',
     })))
+  }
+
+  async function exportInventoryPdf() {
+    const inventory = await fetchInventory()
+    const { exportInventoryToPdf } = await import('@/lib/export/pdf')
+    await exportInventoryToPdf(inventory.map((i: { products?: { name?: string; categories?: { name?: string }; unit?: string; cost_price_usd?: number; sale_price_usd?: number }; quantity: number; min_quantity: number }) => ({
+      name: i.products?.name ?? '',
+      category: i.products?.categories?.name ?? '',
+      unit: i.products?.unit ?? '',
+      quantity: i.quantity,
+      min_quantity: i.min_quantity,
+      cost_price_usd: i.products?.cost_price_usd ?? 0,
+      sale_price_usd: i.products?.sale_price_usd ?? 0,
+    })), rate)
   }
 
   const statusBadge = (status: string) => {
@@ -217,20 +231,7 @@ export default function ReportsPage() {
           <div className="space-y-4">
             <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={exportInventoryReport}><FileSpreadsheet size={14} />تصدير Excel</Button>
-              <Button variant="outline" size="sm" onClick={async () => {
-                const invRes = await fetch('/api/inventory')
-                const inventory = await invRes.json()
-                const { exportInventoryToPdf } = await import('@/lib/export/pdf')
-                await exportInventoryToPdf(inventory.map((i: { products?: { name?: string; categories?: { name?: string }; unit?: string; cost_price_usd?: number; sale_price_usd?: number }; quantity: number; min_quantity: number }) => ({
-                  name: i.products?.name ?? '',
-                  category: i.products?.categories?.name ?? '',
-                  unit: i.products?.unit ?? '',
-                  quantity: i.quantity,
-                  min_quantity: i.min_quantity,
-                  cost_price_usd: i.products?.cost_price_usd ?? 0,
-                  sale_price_usd: i.products?.sale_price_usd ?? 0,
-                })), rate)
-              }}><FileText size={14} />تصدير PDF</Button>
+              <Button variant="outline" size="sm" onClick={exportInventoryPdf}><FileText size={14} />تصدير PDF</Button>
             </div>
             <p className="text-sm text-slate-500">اذهب إلى صفحة المخزون للاطلاع على التفاصيل الكاملة وتصدير التقرير من هناك مباشرة.</p>
           </div>

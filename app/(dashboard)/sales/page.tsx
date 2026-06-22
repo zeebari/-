@@ -11,6 +11,7 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, FileText, Search } from 'lucide-react'
 import type { Sale, Customer, Product, Installment } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { fetchSales, fetchCustomers, fetchProducts, fetchExchangeRate, createSale } from '@/lib/api'
 
 type Currency = 'USD' | 'IQD'
 type PaymentType = 'نقد' | 'دين' | 'أقساط'
@@ -53,16 +54,12 @@ export default function SalesPage() {
 
   async function loadData() {
     setLoading(true)
-    const [saleRes, custRes, prodRes, rateRes] = await Promise.all([
-      fetch('/api/sales'),
-      fetch('/api/customers'),
-      fetch('/api/products'),
-      fetch('/api/exchange-rate'),
+    const [salesData, custsData, prodsData, rateData] = await Promise.all([
+      fetchSales(), fetchCustomers(), fetchProducts(), fetchExchangeRate(),
     ])
-    setSales(await saleRes.json())
-    setCustomers(await custRes.json())
-    setProducts(await prodRes.json())
-    const rateData = await rateRes.json()
+    setSales(salesData as Sale[])
+    setCustomers(custsData as Customer[])
+    setProducts(prodsData as Product[])
     setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
@@ -76,7 +73,6 @@ export default function SalesPage() {
 
   function updateItem(idx: number, field: keyof SaleFormItem, value: string) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
-    // Auto-fill price from product
     if (field === 'product_id') {
       const prod = products.find(p => p.id === value)
       if (prod) {
@@ -117,7 +113,7 @@ export default function SalesPage() {
       installmentsData = generateInstallments()
     }
 
-    const payload = {
+    await createSale({
       customer_id: customerId || null,
       sale_date: saleDate,
       total_amount: subtotal,
@@ -128,9 +124,7 @@ export default function SalesPage() {
       note: note || null,
       items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
       installments: installmentsData,
-    }
-
-    await fetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    })
     await loadData()
     setModalOpen(false)
     setSaving(false)
@@ -229,7 +223,6 @@ export default function SalesPage() {
       {/* New Sale Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="فاتورة بيع جديدة" size="xl">
         <div className="space-y-5">
-          {/* Header */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700">الزبون</label>
@@ -246,7 +239,6 @@ export default function SalesPage() {
               options={[{ value: 'نقد', label: 'نقد' }, { value: 'دين', label: 'دين (آجل)' }, { value: 'أقساط', label: 'أقساط' }]} />
           </div>
 
-          {/* Items Table */}
           <div className="border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
@@ -294,17 +286,11 @@ export default function SalesPage() {
             <Plus size={14} />إضافة صنف
           </Button>
 
-          {/* Total */}
           <div className="bg-blue-50 rounded-lg p-4 text-right">
-            <div className="text-2xl font-bold text-blue-700">
-              المجموع: {subtotal.toFixed(2)} {currency}
-            </div>
-            {currency === 'USD' && (
-              <div className="text-sm text-blue-500 mt-1">= {(subtotal * rate).toLocaleString()} د.ع</div>
-            )}
+            <div className="text-2xl font-bold text-blue-700">المجموع: {subtotal.toFixed(2)} {currency}</div>
+            {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * rate).toLocaleString()} د.ع</div>}
           </div>
 
-          {/* Payment type specific fields */}
           {paymentType === 'نقد' && (
             <div className="bg-green-50 text-green-700 rounded-lg p-3 text-sm">
               سيتم تسجيل الدفع الكامل: {subtotal.toFixed(2)} {currency}

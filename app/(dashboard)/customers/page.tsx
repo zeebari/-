@@ -10,6 +10,10 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, Pencil, CreditCard, History } from 'lucide-react'
 import type { Customer, Sale } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import {
+  fetchCustomers, fetchExchangeRate, fetchSales,
+  createCustomer, updateCustomer, createCustomerPayment,
+} from '@/lib/api'
 
 type ModalType = 'add' | 'edit' | 'payment' | 'history' | null
 
@@ -28,46 +32,39 @@ export default function CustomersPage() {
 
   async function loadData() {
     setLoading(true)
-    const [custRes, rateRes] = await Promise.all([
-      fetch('/api/customers'),
-      fetch('/api/exchange-rate'),
-    ])
-    setCustomers(await custRes.json())
-    const rateData = await rateRes.json()
+    const [custData, rateData] = await Promise.all([fetchCustomers(), fetchExchangeRate()])
+    setCustomers(custData as Customer[])
     setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
   async function loadSales(customerId: string) {
-    const res = await fetch('/api/sales')
-    const all: Sale[] = await res.json()
+    const all = await fetchSales() as Sale[]
     setSales(all.filter(s => s.customer_id === customerId))
   }
 
   async function saveCustomer() {
     if (!form.name) return
     setSaving(true)
-    const url = selected ? `/api/customers/${selected.id}` : '/api/customers'
-    const method = selected ? 'PUT' : 'POST'
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+    if (selected) {
+      await updateCustomer(selected.id, form)
+    } else {
+      await createCustomer(form)
+    }
     await loadData(); setModal(null); setSaving(false)
   }
 
   async function savePayment() {
     if (!selected || !payForm.amount) return
     setSaving(true)
-    await fetch('/api/customers/payments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        customer_id: selected.id,
-        sale_id: payForm.sale_id || null,
-        amount: parseFloat(payForm.amount),
-        currency: payForm.currency,
-        exchange_rate: rate,
-        payment_date: payForm.payment_date,
-        note: payForm.note || null,
-      }),
+    await createCustomerPayment({
+      customer_id: selected.id,
+      sale_id: payForm.sale_id || null,
+      amount: parseFloat(payForm.amount),
+      currency: payForm.currency,
+      exchange_rate: rate,
+      payment_date: payForm.payment_date,
+      note: payForm.note || null,
     })
     await loadData(); setModal(null); setSaving(false)
   }

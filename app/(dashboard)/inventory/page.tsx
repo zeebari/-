@@ -10,6 +10,7 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { FileSpreadsheet, FileText, Pencil, AlertTriangle, Search } from 'lucide-react'
 import type { Inventory } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { fetchInventory, fetchExchangeRate, updateInventory } from '@/lib/api'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<Inventory[]>([])
@@ -24,12 +25,8 @@ export default function InventoryPage() {
 
   async function loadData() {
     setLoading(true)
-    const [invRes, rateRes] = await Promise.all([
-      fetch('/api/inventory'),
-      fetch('/api/exchange-rate'),
-    ])
-    setItems(await invRes.json())
-    const rateData = await rateRes.json()
+    const [invData, rateData] = await Promise.all([fetchInventory(), fetchExchangeRate()])
+    setItems(invData as Inventory[])
     setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
@@ -47,16 +44,12 @@ export default function InventoryPage() {
   async function handleSave() {
     if (!editTarget) return
     setSaving(true)
-    await fetch('/api/inventory', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        product_id: editTarget.product_id,
-        quantity: parseFloat(form.quantity) || 0,
-        min_quantity: parseFloat(form.min_quantity) || 5,
-        warehouse_location: form.warehouse_location || null,
-        note: form.note || null,
-      }),
+    await updateInventory({
+      product_id: editTarget.product_id,
+      quantity: parseFloat(form.quantity) || 0,
+      min_quantity: parseFloat(form.min_quantity) || 5,
+      warehouse_location: form.warehouse_location || null,
+      note: form.note || null,
     })
     await loadData()
     setEditTarget(null)

@@ -8,9 +8,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, Pencil, Trash2, ShoppingBag, CreditCard } from 'lucide-react'
+import { Plus, Pencil, ShoppingBag, CreditCard } from 'lucide-react'
 import type { Supplier, PurchaseOrder, Product } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import {
+  fetchSuppliers, fetchProducts, fetchExchangeRate,
+  createSupplier, updateSupplier,
+  fetchPurchaseOrders, createPurchaseOrder, createSupplierPayment,
+} from '@/lib/api'
 
 type ModalType = 'add-supplier' | 'edit-supplier' | 'purchase-order' | 'payment' | 'history' | null
 
@@ -37,29 +42,26 @@ export default function SuppliersPage() {
 
   async function loadData() {
     setLoading(true)
-    const [supRes, prodRes, rateRes] = await Promise.all([
-      fetch('/api/suppliers'),
-      fetch('/api/products'),
-      fetch('/api/exchange-rate'),
-    ])
-    setSuppliers(await supRes.json())
-    setProducts(await prodRes.json())
-    const rateData = await rateRes.json()
+    const [sups, prods, rateData] = await Promise.all([fetchSuppliers(), fetchProducts(), fetchExchangeRate()])
+    setSuppliers(sups as Supplier[])
+    setProducts(prods as Product[])
     setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
 
   async function loadOrders(supplierId: string) {
-    const res = await fetch(`/api/suppliers/purchase-orders?supplier_id=${supplierId}`)
-    setOrders(await res.json())
+    const data = await fetchPurchaseOrders(supplierId)
+    setOrders(data as PurchaseOrder[])
   }
 
   async function saveSuppiler() {
     if (!supForm.name) return
     setSaving(true)
-    const url = selected ? `/api/suppliers/${selected.id}` : '/api/suppliers'
-    const method = selected ? 'PUT' : 'POST'
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(supForm) })
+    if (selected) {
+      await updateSupplier(selected.id, supForm)
+    } else {
+      await createSupplier(supForm)
+    }
     await loadData(); setModal(null); setSaving(false)
   }
 
@@ -68,20 +70,17 @@ export default function SuppliersPage() {
     setSaving(true)
     const validItems = orderItems.filter(i => i.product_id && i.quantity && i.unit_price)
     const total = validItems.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.unit_price), 0)
-    await fetch('/api/suppliers/purchase-orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        supplier_id: selected.id,
-        order_date: orderDate,
-        total_amount: total,
-        currency: orderCurrency,
-        exchange_rate: rate,
-        amount_paid: parseFloat(amountPaid) || 0,
-        status: parseFloat(amountPaid) >= total ? 'مدفوع' : parseFloat(amountPaid) > 0 ? 'جزئي' : 'معلق',
-        note: orderNote || null,
-        items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
-      }),
+    const paid = parseFloat(amountPaid) || 0
+    await createPurchaseOrder({
+      supplier_id: selected.id,
+      order_date: orderDate,
+      total_amount: total,
+      currency: orderCurrency,
+      exchange_rate: rate,
+      amount_paid: paid,
+      status: paid >= total ? 'مدفوع' : paid > 0 ? 'جزئي' : 'معلق',
+      note: orderNote || null,
+      items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
     })
     await loadData(); setModal(null); setSaving(false)
     setOrderItems([{ product_id: '', quantity: '', unit_price: '' }])
@@ -90,18 +89,14 @@ export default function SuppliersPage() {
   async function savePayment() {
     if (!selected || !payForm.amount) return
     setSaving(true)
-    await fetch('/api/suppliers/payments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        supplier_id: selected.id,
-        purchase_order_id: payForm.purchase_order_id || null,
-        amount: parseFloat(payForm.amount),
-        currency: payForm.currency,
-        exchange_rate: rate,
-        payment_date: payForm.payment_date,
-        note: payForm.note || null,
-      }),
+    await createSupplierPayment({
+      supplier_id: selected.id,
+      purchase_order_id: payForm.purchase_order_id || null,
+      amount: parseFloat(payForm.amount),
+      currency: payForm.currency,
+      exchange_rate: rate,
+      payment_date: payForm.payment_date,
+      note: payForm.note || null,
     })
     await loadData(); setModal(null); setSaving(false)
   }

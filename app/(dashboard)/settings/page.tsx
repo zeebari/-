@@ -5,15 +5,15 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle } from 'lucide-react'
+import { fetchExchangeRate, saveExchangeRate, fetchCategories, createCategory } from '@/lib/api'
 
 interface ExchangeRate {
-  id: string
   usd_to_iqd: number
   rate_date: string
 }
 
 export default function SettingsPage() {
-  const [rates, setRates] = useState<ExchangeRate[]>([])
+  const [rate, setRate] = useState<ExchangeRate | null>(null)
   const [newRate, setNewRate] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -23,24 +23,15 @@ export default function SettingsPage() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const [ratesRes, catsRes] = await Promise.all([
-      fetch('/api/exchange-rate'),
-      fetch('/api/categories'),
-    ])
-    const rateData = await ratesRes.json()
-    setRates(Array.isArray(rateData) ? rateData : [rateData])
-    const cats = await catsRes.json()
-    setCategories(Array.isArray(cats) ? cats : [])
+    const [rateData, cats] = await Promise.all([fetchExchangeRate(), fetchCategories()])
+    setRate(rateData)
+    setCategories(cats as { id: string; name: string }[])
   }
 
-  async function saveRate() {
+  async function handleSaveRate() {
     if (!newRate) return
     setSaving(true)
-    await fetch('/api/exchange-rate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ usd_to_iqd: parseFloat(newRate) }),
-    })
+    await saveExchangeRate(parseFloat(newRate))
     setNewRate('')
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -50,16 +41,12 @@ export default function SettingsPage() {
 
   async function addCategory() {
     if (!newCat) return
-    await fetch('/api/categories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: newCat }),
-    })
+    await createCategory(newCat)
     setNewCat('')
     await loadData()
   }
 
-  const currentRate = rates[0]?.usd_to_iqd ?? 1310
+  const currentRate = rate?.usd_to_iqd ?? 1310
 
   return (
     <DashboardLayout title="الإعدادات">
@@ -70,7 +57,7 @@ export default function SettingsPage() {
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
             <div className="text-sm text-slate-500 mb-1">السعر الحالي</div>
             <div className="text-2xl font-bold text-blue-700">1 USD = {currentRate.toLocaleString()} IQD</div>
-            <div className="text-xs text-slate-400 mt-1">{rates[0]?.rate_date}</div>
+            <div className="text-xs text-slate-400 mt-1">{rate?.rate_date}</div>
           </div>
           <div className="flex gap-3 items-end">
             <Input
@@ -81,7 +68,7 @@ export default function SettingsPage() {
               placeholder="مثال: 1310"
               className="flex-1"
             />
-            <Button onClick={saveRate} loading={saving}>
+            <Button onClick={handleSaveRate} loading={saving}>
               {saved ? <><CheckCircle size={16} />تم الحفظ</> : 'حفظ'}
             </Button>
           </div>

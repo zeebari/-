@@ -28,12 +28,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      const [statsRes, rateRes] = await Promise.all([
-        fetch('/api/reports?type=dashboard'),
-        fetch('/api/exchange-rate'),
+      const [statsData, rateData] = await Promise.all([
+        import('@/lib/api').then(m => m.fetchDashboardStats()),
+        import('@/lib/api').then(m => m.fetchExchangeRate()),
       ])
-      const statsData = await statsRes.json()
-      const rateData = await rateRes.json()
       setStats(statsData)
       setRate(rateData.usd_to_iqd ?? 1310)
       setLoading(false)

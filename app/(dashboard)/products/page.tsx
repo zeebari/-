@@ -12,6 +12,10 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 import type { Product, Category } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import {
+  fetchProducts, fetchCategories, fetchExchangeRate,
+  createProduct, updateProduct, deleteProduct,
+} from '@/lib/api'
 
 const UNITS = ['قطعة', 'كيلو', 'لتر', 'علبة', 'كارتون', 'متر', 'زوج']
 
@@ -32,21 +36,13 @@ export default function ProductsPage() {
     cost_price_usd: '', sale_price_usd: '', barcode: '', description: '',
   })
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
     setLoading(true)
-    const [prodRes, catRes, rateRes] = await Promise.all([
-      fetch('/api/products'),
-      fetch('/api/categories'),
-      fetch('/api/exchange-rate'),
-    ])
-    setProducts(await prodRes.json())
-    const cats = await catRes.json()
-    setCategories(Array.isArray(cats) ? cats : [])
-    const rateData = await rateRes.json()
+    const [prods, cats, rateData] = await Promise.all([fetchProducts(), fetchCategories(), fetchExchangeRate()])
+    setProducts(prods as Product[])
+    setCategories(cats as Category[])
     setRate(rateData.usd_to_iqd ?? 1310)
     setLoading(false)
   }
@@ -83,17 +79,20 @@ export default function ProductsPage() {
       barcode: form.barcode || null,
       description: form.description || null,
     }
-    const url = editTarget ? `/api/products/${editTarget.id}` : '/api/products'
-    const method = editTarget ? 'PUT' : 'POST'
-    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    if (res.ok) { await loadData(); setModalOpen(false) }
+    if (editTarget) {
+      await updateProduct(editTarget.id, payload)
+    } else {
+      await createProduct(payload)
+    }
+    await loadData()
+    setModalOpen(false)
     setSaving(false)
   }
 
   async function handleDelete() {
     if (!deleteTarget) return
     setDeleting(true)
-    await fetch(`/api/products/${deleteTarget.id}`, { method: 'DELETE' })
+    await deleteProduct(deleteTarget.id)
     await loadData()
     setDeleteTarget(null)
     setDeleting(false)
