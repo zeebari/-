@@ -21,7 +21,7 @@ export async function saveExchangeRate(usd_to_iqd: number) {
 }
 
 export async function fetchCategories() {
-  const { data, error } = await supabase.from('categories').select('*').order('name')
+  const { data, error } = await supabase.from('categories').select('*').is('deleted_at', null).order('name')
   if (error) throw error
   return data ?? []
 }
@@ -36,6 +36,7 @@ export async function fetchCustomers() {
   const { data, error } = await supabase
     .from('customers')
     .select('*')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -159,6 +160,7 @@ export async function fetchProducts() {
   const { data, error } = await supabase
     .from('products')
     .select('*, categories(name)')
+    .is('deleted_at', null)
     .order('name')
   if (error) throw error
   return data ?? []
@@ -186,7 +188,7 @@ export async function updateProduct(id: string, body: object) {
 }
 
 export async function deleteProduct(id: string) {
-  const { error } = await supabase.from('products').delete().eq('id', id)
+  const { error } = await supabase.from('products').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
@@ -194,6 +196,7 @@ export async function fetchSuppliers() {
   const { data, error } = await supabase
     .from('suppliers')
     .select('*')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
@@ -387,6 +390,7 @@ export async function fetchExpenses(from?: string, to?: string) {
   let query = supabase
     .from('expenses')
     .select('*')
+    .is('deleted_at', null)
     .order('expense_date', { ascending: false })
   if (from) query = query.gte('expense_date', from)
   if (to) query = query.lte('expense_date', to)
@@ -410,7 +414,7 @@ export async function createExpense(body: {
 }
 
 export async function deleteExpense(id: string) {
-  const { error } = await supabase.from('expenses').delete().eq('id', id)
+  const { error } = await supabase.from('expenses').update({ deleted_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
