@@ -53,7 +53,7 @@ export default function ExpensesPage() {
       description: form.description,
       amount: parseFloat(form.amount),
       currency: form.currency,
-      exchange_rate: IQD_RATE,
+      exchange_rate: form.currency === 'IQD' ? IQD_RATE : 1,
       expense_date: form.expense_date,
       note: form.note || undefined,
     })
@@ -70,7 +70,7 @@ export default function ExpensesPage() {
   }
 
   const toIQD = (e: Expense) =>
-    e.currency === 'IQD' ? e.amount : e.amount * IQD_RATE
+    e.currency === 'IQD' ? e.amount : e.amount * e.exchange_rate
 
   const toUSD = (e: Expense) =>
     e.currency === 'USD' ? e.amount : e.amount / e.exchange_rate
