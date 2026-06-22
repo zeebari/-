@@ -213,8 +213,8 @@ export default function SuppliersPage() {
             <Input label="المبلغ المدفوع" type="number" step="0.01" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder="0" />
           </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border border-slate-200 rounded-lg overflow-x-auto">
+            <table className="w-full text-sm min-w-[400px]">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium text-slate-600">المنتج</th>

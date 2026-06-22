@@ -413,13 +413,14 @@ export async function updateInventory(body: {
 export async function fetchDashboardStats() {
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
+  const IQD = 1310
 
-  const [todaySales, monthSales, customerDebt, supplierDebt, lowStock] = await Promise.all([
+  const [todaySales, monthSales, customerDebt, supplierDebt, allInventory] = await Promise.all([
     supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null).eq('sale_date', today),
     supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null).gte('sale_date', monthStart),
     supabase.from('customers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
-    supabase.from('suppliers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
-    supabase.from('inventory').select('quantity, min_quantity').is('deleted_at', null).filter('quantity', 'lte', 'min_quantity'),
+    supabase.from('suppliers').select('balance_owed, currency').is('deleted_at', null).gt('balance_owed', 0),
+    supabase.from('inventory').select('quantity, min_quantity').is('deleted_at', null),
   ])
 
   const sumUSD = (rows: { total_amount: number; currency: string; exchange_rate: number }[]) =>
@@ -429,8 +430,9 @@ export async function fetchDashboardStats() {
     today_sales_usd: sumUSD(todaySales.data ?? []),
     month_sales_usd: sumUSD(monthSales.data ?? []),
     customer_debt_usd: (customerDebt.data ?? []).reduce((s, r) => s + r.balance_owed, 0),
-    supplier_debt_usd: (supplierDebt.data ?? []).reduce((s, r) => s + r.balance_owed, 0),
-    low_stock_count: (lowStock.data ?? []).length,
+    supplier_debt_usd: (supplierDebt.data ?? []).reduce((s, r) =>
+      s + (r.currency === 'IQD' ? r.balance_owed / IQD : r.balance_owed), 0),
+    low_stock_count: (allInventory.data ?? []).filter(r => r.quantity <= r.min_quantity).length,
   }
 }
 

@@ -375,19 +375,22 @@ export default function SalesPage() {
           </Button>
 
           <div className="bg-blue-50 rounded-lg p-4 text-right">
-            <div className="text-2xl font-bold text-blue-700">المجموع: {subtotal.toFixed(2)} {currency}</div>
+            <div className="text-2xl font-bold text-blue-700">
+              المجموع: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) : subtotal.toFixed(2)} {currency === 'IQD' ? 'د.ع' : '$'}
+            </div>
             {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</div>}
+            {currency === 'IQD' && <div className="text-sm text-blue-500 mt-1">= ${(subtotal / IQD_RATE).toFixed(2)}</div>}
           </div>
 
           {paymentType === 'نقد' && (
             <div className="bg-green-50 text-green-700 rounded-lg p-3 text-sm">
-              سيتم تسجيل الدفع الكامل: {subtotal.toFixed(2)} {currency}
+              سيتم تسجيل الدفع الكامل: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' د.ع' : '$' + subtotal.toFixed(2)}
             </div>
           )}
 
           {paymentType === 'دين' && (
             <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">
-              سيُضاف المبلغ كاملاً لرصيد دين الزبون: {subtotal.toFixed(2)} {currency}
+              سيُضاف المبلغ كاملاً لرصيد دين الزبون: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' د.ع' : '$' + subtotal.toFixed(2)}
             </div>
           )}
 

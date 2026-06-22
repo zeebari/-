@@ -168,7 +168,7 @@ export default function InventoryPage() {
                     <Td className="text-slate-500 text-xs">
                       {(item.products?.price_currency ?? 'USD') === 'USD'
                         ? formatCurrency((item.products?.sale_price_usd ?? 0) * IQD_RATE, 'IQD')
-                        : formatCurrency((item.products?.sale_price_usd ?? 0) / IQD_RATE, 'USD')}
+                        : formatCurrency(item.products?.sale_price_usd ?? 0, 'IQD')}
                     </Td>
                     <Td>
                       <Badge variant={isLow ? 'danger' : 'success'}>

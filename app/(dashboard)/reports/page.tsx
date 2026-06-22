@@ -63,7 +63,8 @@ export default function ReportsPage() {
     s + (sale.currency === 'USD' ? sale.total_amount : sale.total_amount / sale.exchange_rate), 0)
 
   const totalCustomerDebt = debts.customers.reduce((s, c) => s + c.balance_owed, 0)
-  const totalSupplierDebt = debts.suppliers.reduce((s, s2) => s + s2.balance_owed, 0)
+  const totalSupplierDebtUSD = debts.suppliers.reduce((s, s2) =>
+    s + (s2.currency === 'IQD' ? s2.balance_owed / IQD_RATE : s2.balance_owed), 0)
 
   async function exportSalesExcel() {
     const { exportSalesToExcel } = await import('@/lib/export/excel')
@@ -206,8 +207,8 @@ export default function ReportsPage() {
             </div>
             <div className="card">
               <h3 className="font-semibold text-slate-800 mb-3">مستحقات الموردين</h3>
-              <div className="text-2xl font-bold text-purple-600 mb-1">{formatCurrency(totalSupplierDebt * IQD_RATE, 'IQD')}</div>
-              <div className="text-xs text-slate-400 mb-4">{formatCurrency(totalSupplierDebt, 'USD')}</div>
+              <div className="text-2xl font-bold text-purple-600 mb-1">{formatCurrency(totalSupplierDebtUSD * IQD_RATE, 'IQD')}</div>
+              <div className="text-xs text-slate-400 mb-4">{formatCurrency(totalSupplierDebtUSD, 'USD')}</div>
               <div className="space-y-2">
                 {debts.suppliers.map(s => (
                   <div key={s.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
