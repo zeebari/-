@@ -77,9 +77,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
           </ul>
         </nav>
 
-        <div className="px-5 py-3 border-t border-slate-700 text-xs text-slate-500">
-          v1.0.0 © 2024
-        </div>
+
       </aside>
     </>
   )
