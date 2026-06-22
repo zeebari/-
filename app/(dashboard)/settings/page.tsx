@@ -4,23 +4,18 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, Send, Wallet } from 'lucide-react'
+import { CheckCircle, Wallet } from 'lucide-react'
 import { IQD_RATE } from '@/lib/config'
 import { fetchCategories, createCategory } from '@/lib/api'
 
 export default function SettingsPage() {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [newCat, setNewCat] = useState('')
-  const [backupSending, setBackupSending] = useState(false)
-  const [backupStatus, setBackupStatus] = useState<'idle' | 'ok' | 'err'>('idle')
-  const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [capital, setCapital] = useState('')
   const [capitalCurrency, setCapitalCurrency] = useState<'USD' | 'IQD'>('USD')
   const [capitalSaved, setCapitalSaved] = useState(false)
 
   useEffect(() => {
-    const ts = localStorage.getItem('last_telegram_backup')
-    if (ts) setLastBackup(new Date(parseInt(ts, 10)).toLocaleString('en-US'))
     const saved = localStorage.getItem('initial_capital_usd')
     if (saved) setCapital(saved)
     fetchCategories().then(cats => setCategories(cats as { id: string; name: string }[]))
@@ -40,24 +35,6 @@ export default function SettingsPage() {
       ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع`
       : `= $${((parseFloat(capital) || 0) / IQD_RATE).toFixed(2)}`
     : null
-
-  async function sendBackupNow() {
-    setBackupSending(true)
-    setBackupStatus('idle')
-    try {
-      const { sendBackupToTelegram } = await import('@/lib/telegram')
-      await sendBackupToTelegram()
-      const now = Date.now()
-      localStorage.setItem('last_telegram_backup', now.toString())
-      setLastBackup(new Date(now).toLocaleString('en-US'))
-      setBackupStatus('ok')
-    } catch {
-      setBackupStatus('err')
-    } finally {
-      setBackupSending(false)
-      setTimeout(() => setBackupStatus('idle'), 3000)
-    }
-  }
 
   async function addCategory() {
     if (!newCat) return
@@ -124,34 +101,6 @@ export default function SettingsPage() {
             />
             <Button variant="secondary" onClick={addCategory}>إضافة</Button>
           </div>
-        </div>
-
-        {/* Telegram Backup */}
-        <div className="card space-y-4">
-          <h2 className="text-base font-semibold text-slate-800">النسخ الاحتياطي — تليكرام</h2>
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-600 space-y-1">
-            <div className="flex justify-between">
-              <span>الحالة:</span>
-              <strong className="text-green-600">نشط — كل ساعة تلقائياً</strong>
-            </div>
-            {lastBackup && (
-              <div className="flex justify-between">
-                <span>آخر نسخة:</span>
-                <strong>{lastBackup}</strong>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            <Button onClick={sendBackupNow} loading={backupSending} variant="secondary">
-              <Send size={15} />
-              إرسال نسخة الآن
-            </Button>
-            {backupStatus === 'ok' && <span className="text-green-600 text-sm flex items-center gap-1"><CheckCircle size={14} />تم الإرسال</span>}
-            {backupStatus === 'err' && <span className="text-red-500 text-sm">فشل الإرسال — تحقق من البوت</span>}
-          </div>
-          <p className="text-xs text-slate-400">
-            يُرسل ملف Excel يحتوي على جميع البيانات (زبائن، موردون، مبيعات، مصاريف، مخزون) إلى حسابك على تليكرام.
-          </p>
         </div>
 
       </div>
