@@ -8,11 +8,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, FileText, Search } from 'lucide-react'
+import { Plus, FileText, Search, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Sale, Customer, Product, Installment } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
 import { IQD_RATE } from '@/lib/config'
-import { fetchSales, fetchCustomers, fetchProducts, createSale } from '@/lib/api'
+import { fetchSales, fetchCustomers, fetchProducts, createSale, deleteSale } from '@/lib/api'
 
 type Currency = 'USD' | 'IQD'
 type PaymentType = 'نقد' | 'دين' | 'أقساط'
@@ -33,6 +34,8 @@ export default function SalesPage() {
   const [saveError, setSaveError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [detailSale, setDetailSale] = useState<Sale | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Sale | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Form state
   const [currency, setCurrency] = useState<Currency>('USD')
@@ -143,6 +146,15 @@ export default function SalesPage() {
     setSaving(false)
   }
 
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteSale(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
+  }
+
   async function printSale(sale: Sale) {
     const { exportSaleToPdf } = await import('@/lib/export/pdf')
     await exportSaleToPdf({
@@ -201,7 +213,7 @@ export default function SalesPage() {
                 <Th>المدفوع</Th>
                 <Th>المتبقي</Th>
                 <Th>الحالة</Th>
-                <Th>طباعة</Th>
+                <Th>إجراءات</Th>
               </tr>
             </Thead>
             <Tbody>
@@ -222,9 +234,14 @@ export default function SalesPage() {
                   </Td>
                   <Td>{statusBadge(s.status)}</Td>
                   <Td>
-                    <button onClick={e => { e.stopPropagation(); printSale(s) }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">
-                      <FileText size={14} />
-                    </button>
+                    <div className="flex gap-1">
+                      <button onClick={e => { e.stopPropagation(); printSale(s) }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" title="طباعة">
+                        <FileText size={14} />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setDeleteTarget(s) }} className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </Td>
                 </Tr>
               ))}
@@ -402,6 +419,15 @@ export default function SalesPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف فاتورة"
+        message={`هل أنت متأكد من حذف فاتورة #${deleteTarget?.id.slice(0, 8).toUpperCase()}؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }

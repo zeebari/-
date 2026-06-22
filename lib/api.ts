@@ -95,9 +95,15 @@ export async function fetchSales() {
   const { data, error } = await supabase
     .from('sales')
     .select('*, customers(name, phone), sale_items(*, products(name, unit))')
+    .is('deleted_at', null)
     .order('created_at', { ascending: false })
   if (error) throw error
   return data ?? []
+}
+
+export async function deleteSale(id: string) {
+  const { error } = await supabase.from('sales').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
 }
 
 export async function createSale(body: {
