@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__292e35bc-111d-41ec-8027-afa8b813e850__*",
+      "mcp__58c4802b-7f0e-472e-b086-96ea944d3117__*",
+      "mcp__github__pull_request_read",
+      "mcp__github__list_pull_requests",
+      "mcp__github__subscribe_pr_activity",
+      "mcp__github__unsubscribe_pr_activity"
+    ]
+  }
+}
