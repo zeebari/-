@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, Send, Wallet } from 'lucide-react'
+import { IQD_RATE } from '@/lib/config'
 import { fetchCategories, createCategory } from '@/lib/api'
 
 export default function SettingsPage() {
@@ -14,6 +15,7 @@ export default function SettingsPage() {
   const [backupStatus, setBackupStatus] = useState<'idle' | 'ok' | 'err'>('idle')
   const [lastBackup, setLastBackup] = useState<string | null>(null)
   const [capital, setCapital] = useState('')
+  const [capitalCurrency, setCapitalCurrency] = useState<'USD' | 'IQD'>('USD')
   const [capitalSaved, setCapitalSaved] = useState(false)
 
   useEffect(() => {
@@ -25,10 +27,19 @@ export default function SettingsPage() {
   }, [])
 
   function saveCapital() {
-    localStorage.setItem('initial_capital_usd', capital)
+    const usd = capitalCurrency === 'IQD'
+      ? (parseFloat(capital) || 0) / IQD_RATE
+      : parseFloat(capital) || 0
+    localStorage.setItem('initial_capital_usd', String(usd))
     setCapitalSaved(true)
     setTimeout(() => setCapitalSaved(false), 2000)
   }
+
+  const capitalPreview = capital
+    ? capitalCurrency === 'USD'
+      ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString()} د.ع`
+      : `= $${((parseFloat(capital) || 0) / IQD_RATE).toFixed(2)}`
+    : null
 
   async function sendBackupNow() {
     setBackupSending(true)
@@ -66,16 +77,27 @@ export default function SettingsPage() {
             <h2 className="text-base font-semibold text-slate-800">رأس المال الأولي</h2>
           </div>
           <p className="text-sm text-slate-500">أدخل رأس المال الذي استثمرته في المشروع لحساب الصافي والمبلغ المداور في لوحة التحكم</p>
+          <div className="flex gap-2 mb-1">
+            {(['USD', 'IQD'] as const).map(cur => (
+              <button key={cur} type="button"
+                onClick={() => setCapitalCurrency(cur)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${capitalCurrency === cur ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400'}`}>
+                {cur === 'USD' ? 'دولار ($)' : 'دينار (د.ع)'}
+              </button>
+            ))}
+          </div>
           <div className="flex gap-3 items-end">
-            <Input
-              label="رأس المال ($)"
-              type="number"
-              step="0.01"
-              value={capital}
-              onChange={e => setCapital(e.target.value)}
-              placeholder="0.00"
-              className="flex-1"
-            />
+            <div className="flex-1">
+              <Input
+                label={`رأس المال (${capitalCurrency === 'USD' ? '$' : 'د.ع'})`}
+                type="number"
+                step={capitalCurrency === 'USD' ? '0.01' : '1'}
+                value={capital}
+                onChange={e => setCapital(e.target.value)}
+                placeholder="0"
+              />
+              {capitalPreview && <p className="text-xs text-slate-400 mt-1 mr-1">{capitalPreview}</p>}
+            </div>
             <Button onClick={saveCapital} variant="secondary">حفظ</Button>
           </div>
           {capitalSaved && (
