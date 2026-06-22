@@ -4,7 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { CheckCircle, Wallet } from 'lucide-react'
+import { CheckCircle, Wallet, Send } from 'lucide-react'
 import { IQD_RATE } from '@/lib/config'
 import { fetchCategories, createCategory } from '@/lib/api'
 
@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const [capital, setCapital] = useState('')
   const [capitalCurrency, setCapitalCurrency] = useState<'USD' | 'IQD'>('USD')
   const [capitalSaved, setCapitalSaved] = useState(false)
+  const [backupStatus, setBackupStatus] = useState<'idle' | 'sending' | 'done' | 'error'>('idle')
 
   useEffect(() => {
     const saved = localStorage.getItem('initial_capital_usd')
@@ -35,6 +36,19 @@ export default function SettingsPage() {
       ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع`
       : `= $${((parseFloat(capital) || 0) / IQD_RATE).toFixed(2)}`
     : null
+
+  async function sendBackup() {
+    setBackupStatus('sending')
+    try {
+      const { sendBackupToTelegram } = await import('@/lib/telegram')
+      await sendBackupToTelegram()
+      setBackupStatus('done')
+      setTimeout(() => setBackupStatus('idle'), 3000)
+    } catch {
+      setBackupStatus('error')
+      setTimeout(() => setBackupStatus('idle'), 4000)
+    }
+  }
 
   async function addCategory() {
     if (!newCat) return
@@ -80,6 +94,31 @@ export default function SettingsPage() {
           {capitalSaved && (
             <span className="text-green-600 text-sm flex items-center gap-1"><CheckCircle size={14} />تم الحفظ</span>
           )}
+        </div>
+
+        {/* Telegram Backup */}
+        <div className="card space-y-4">
+          <div className="flex items-center gap-2">
+            <Send size={18} className="text-blue-500" />
+            <h2 className="text-base font-semibold text-slate-800">نسخة احتياطية — تيليغرام</h2>
+          </div>
+          <p className="text-sm text-slate-500">إرسال ملف Excel يحتوي على كامل البيانات (زبائن، موردين، منتجات، مبيعات، مصاريف، مخزون) إلى مجموعة التيليغرام</p>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={sendBackup}
+              loading={backupStatus === 'sending'}
+              variant="secondary"
+            >
+              <Send size={15} />
+              {backupStatus === 'sending' ? 'جاري الإرسال...' : 'إرسال نسخة احتياطية'}
+            </Button>
+            {backupStatus === 'done' && (
+              <span className="text-green-600 text-sm flex items-center gap-1"><CheckCircle size={14} />تم الإرسال بنجاح</span>
+            )}
+            {backupStatus === 'error' && (
+              <span className="text-red-600 text-sm">فشل الإرسال — تحقق من إعدادات البوت</span>
+            )}
+          </div>
         </div>
 
         {/* Categories */}

@@ -74,7 +74,7 @@ export default function CustomersPage() {
       sale_id: payForm.sale_id || null,
       amount: parseFloat(payForm.amount),
       currency: payForm.currency,
-      exchange_rate: IQD_RATE,
+      exchange_rate: payForm.currency === 'IQD' ? IQD_RATE : 1,
       payment_date: payForm.payment_date,
       note: payForm.note || null,
     })
@@ -83,16 +83,25 @@ export default function CustomersPage() {
 
   function getWaMessage(c: Customer, lang: 'ar' | 'ku' | 'en') {
     const amtIQD = formatCurrency(c.balance_owed * IQD_RATE, 'IQD')
+    const amtUSD = formatCurrency(c.balance_owed, 'USD')
     if (lang === 'ar')
       return `السلام عليكم ${c.name}،\nنذكركم بمبلغ الدين المتبقي: ${amtIQD}.\nيرجى التواصل معنا لترتيب الدفع.\nشكراً`
     if (lang === 'ku')
       return `سه‌ره‌تای باش ${c.name}،\nبیرت بکه‌وه‌ له‌ قه‌رزی ماوه‌ته‌وه‌ی: ${amtIQD}.\nتکایه‌ پێوه‌ند بکه‌.\nسپاس`
-    return `Hello ${c.name},\nThis is a reminder for your outstanding balance: ${amtIQD}.\nPlease contact us to arrange payment.\nThank you.`
+    return `Hello ${c.name},\nThis is a reminder for your outstanding balance: ${amtUSD}.\nPlease contact us to arrange payment.\nThank you.`
+  }
+
+  function normalizePhone(raw: string | null | undefined): string {
+    if (!raw) return ''
+    const digits = raw.replace(/[^0-9]/g, '')
+    // Iraqi local format 07xx → 9647xx
+    if (digits.startsWith('07') && digits.length === 11) return '964' + digits.slice(1)
+    return digits
   }
 
   function openWhatsApp(c: Customer) {
     const msg = getWaMessage(c, waLang)
-    const phone = c.phone?.replace(/[^0-9]/g, '') ?? ''
+    const phone = normalizePhone(c.phone)
     const url = phone
       ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
       : `https://wa.me/?text=${encodeURIComponent(msg)}`

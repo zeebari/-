@@ -6,11 +6,11 @@ const CHAT_ID = process.env.NEXT_PUBLIC_TELEGRAM_CHAT_ID!
 
 async function buildBackupWorkbook() {
   const [customers, suppliers, products, inventory, sales, expenses] = await Promise.all([
-    supabase.from('customers').select('*').order('created_at'),
-    supabase.from('suppliers').select('*').order('created_at'),
-    supabase.from('products').select('*, categories(name)').order('created_at'),
-    supabase.from('inventory').select('*, products(name)').order('updated_at', { ascending: false }),
-    supabase.from('sales').select('*, customers(name)').order('sale_date', { ascending: false }),
+    supabase.from('customers').select('*').is('deleted_at', null).order('created_at'),
+    supabase.from('suppliers').select('*').is('deleted_at', null).order('created_at'),
+    supabase.from('products').select('*, categories(name)').is('deleted_at', null).order('created_at'),
+    supabase.from('inventory').select('*, products(name)').is('deleted_at', null).order('updated_at', { ascending: false }),
+    supabase.from('sales').select('*, customers(name)').is('deleted_at', null).order('sale_date', { ascending: false }),
     supabase.from('expenses').select('*').order('expense_date', { ascending: false }),
   ])
 
@@ -37,8 +37,8 @@ async function buildBackupWorkbook() {
       الاسم: r.name,
       الهاتف: r.phone ?? '',
       العنوان: r.address ?? '',
-      'المستحق عليه $': r.balance_owed,
-      العملة: r.currency,
+      'المستحق عليه': r.balance_owed,
+      'عملة المورد': r.currency,
       'تاريخ الإضافة': r.created_at?.slice(0, 10),
     })),
     'الموردون'
@@ -51,6 +51,7 @@ async function buildBackupWorkbook() {
       الوحدة: r.unit,
       'سعر التكلفة': r.cost_price_usd,
       'سعر البيع': r.sale_price_usd,
+      'عملة السعر': r.price_currency ?? 'USD',
     })),
     'المنتجات'
   )
