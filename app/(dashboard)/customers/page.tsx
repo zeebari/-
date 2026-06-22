@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, Pencil, CreditCard, History, Trash2 } from 'lucide-react'
+import { Plus, Pencil, CreditCard, History, Trash2, MessageCircle } from 'lucide-react'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Customer, Sale } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
@@ -17,7 +17,7 @@ import {
   createCustomer, updateCustomer, deleteCustomer, createCustomerPayment,
 } from '@/lib/api'
 
-type ModalType = 'add' | 'edit' | 'payment' | 'history' | null
+type ModalType = 'add' | 'edit' | 'payment' | 'history' | 'whatsapp' | null
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -29,7 +29,8 @@ export default function CustomersPage() {
   const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', address: '' })
-  const [payForm, setPayForm] = useState({ amount: '', currency: 'USD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] })
+  const [payForm, setPayForm] = useState({ amount: '', currency: 'IQD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] })
+  const [waLang, setWaLang] = useState<'ar' | 'ku' | 'en'>('ar')
 
   useEffect(() => { loadData() }, [])
 
@@ -80,6 +81,24 @@ export default function CustomersPage() {
     await loadData(); setModal(null); setSaving(false)
   }
 
+  function getWaMessage(c: Customer, lang: 'ar' | 'ku' | 'en') {
+    const amtIQD = formatCurrency(c.balance_owed * IQD_RATE, 'IQD')
+    if (lang === 'ar')
+      return `السلام عليكم ${c.name}،\nنذكركم بمبلغ الدين المتبقي: ${amtIQD}.\nيرجى التواصل معنا لترتيب الدفع.\nشكراً`
+    if (lang === 'ku')
+      return `سه‌ره‌تای باش ${c.name}،\nبیرت بکه‌وه‌ له‌ قه‌رزی ماوه‌ته‌وه‌ی: ${amtIQD}.\nتکایه‌ پێوه‌ند بکه‌.\nسپاس`
+    return `Hello ${c.name},\nThis is a reminder for your outstanding balance: ${amtIQD}.\nPlease contact us to arrange payment.\nThank you.`
+  }
+
+  function openWhatsApp(c: Customer) {
+    const msg = getWaMessage(c, waLang)
+    const phone = c.phone?.replace(/[^0-9]/g, '') ?? ''
+    const url = phone
+      ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`
+    window.open(url, '_blank')
+  }
+
   const statusBadge = (status: string) => {
     if (status === 'مدفوع') return <Badge variant="success">{status}</Badge>
     if (status === 'جزئي') return <Badge variant="warning">{status}</Badge>
@@ -102,15 +121,14 @@ export default function CustomersPage() {
               <Th>الزبون</Th>
               <Th>الهاتف</Th>
               <Th>رصيد الدين</Th>
-              <Th>بالدينار</Th>
               <Th>إجراءات</Th>
             </tr>
           </Thead>
           <Tbody>
             {loading ? (
-              <Tr><Td className="text-center py-8 text-slate-400" colSpan={5}>جاري التحميل...</Td></Tr>
+              <Tr><Td className="text-center py-8 text-slate-400" colSpan={4}>جاري التحميل...</Td></Tr>
             ) : customers.length === 0 ? (
-              <Tr><Td className="text-center py-8 text-slate-400" colSpan={5}>لا يوجد زبائن</Td></Tr>
+              <Tr><Td className="text-center py-8 text-slate-400" colSpan={4}>لا يوجد زبائن</Td></Tr>
             ) : customers.map(c => (
               <Tr key={c.id}>
                 <Td>
@@ -118,20 +136,28 @@ export default function CustomersPage() {
                   {c.address && <div className="text-xs text-slate-400">{c.address}</div>}
                 </Td>
                 <Td>{c.phone ?? '—'}</Td>
-                <Td className={c.balance_owed > 0 ? 'font-semibold text-red-600' : 'text-green-600'}>
-                  {formatCurrency(c.balance_owed, 'USD')}
+                <Td>
+                  <div className={c.balance_owed > 0 ? 'font-semibold text-red-600' : 'text-green-600'}>
+                    {formatCurrency(c.balance_owed * IQD_RATE, 'IQD')}
+                  </div>
+                  <div className="text-xs text-slate-400">{formatCurrency(c.balance_owed, 'USD')}</div>
                 </Td>
-                <Td className="text-slate-500">{formatCurrency(c.balance_owed * IQD_RATE, 'IQD')}</Td>
                 <Td>
                   <div className="flex gap-1">
                     <button onClick={() => { setSelected(c); setForm({ name: c.name, phone: c.phone ?? '', address: c.address ?? '' }); setModal('edit') }}
                       className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="تعديل">
                       <Pencil size={14} />
                     </button>
-                    <button onClick={() => { setSelected(c); setPayForm({ amount: '', currency: 'USD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] }); setModal('payment') }}
+                    <button onClick={() => { setSelected(c); setPayForm({ amount: '', currency: 'IQD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] }); setModal('payment') }}
                       className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="تسجيل دفعة">
                       <CreditCard size={14} />
                     </button>
+                    {c.balance_owed > 0 && (
+                      <button onClick={() => { setSelected(c); setModal('whatsapp') }}
+                        className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="تذكير واتساب">
+                        <MessageCircle size={14} />
+                      </button>
+                    )}
                     <button onClick={() => { setSelected(c); loadSales(c.id); setModal('history') }}
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" title="السجل">
                       <History size={14} />
@@ -161,12 +187,46 @@ export default function CustomersPage() {
         </div>
       </Modal>
 
+      {/* WhatsApp Reminder */}
+      <Modal open={modal === 'whatsapp'} onClose={() => setModal(null)} title={`تذكير واتساب — ${selected?.name}`} size="sm">
+        <div className="space-y-4">
+          <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-3 text-sm">
+            رصيد الدين: <strong>{formatCurrency((selected?.balance_owed ?? 0) * IQD_RATE, 'IQD')}</strong>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">لغة الرسالة</label>
+            <div className="flex gap-2">
+              {(['ar', 'ku', 'en'] as const).map(lang => (
+                <button key={lang}
+                  onClick={() => setWaLang(lang)}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border transition-colors ${waLang === lang ? 'bg-green-600 text-white border-green-600' : 'border-slate-300 text-slate-600 hover:border-green-400'}`}>
+                  {lang === 'ar' ? 'عربي' : lang === 'ku' ? 'كوردي' : 'English'}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="bg-slate-50 rounded-lg p-3 text-sm text-slate-700 whitespace-pre-line leading-relaxed border border-slate-200">
+            {selected && getWaMessage(selected, waLang)}
+          </div>
+          <div className="flex gap-3 justify-end">
+            <button onClick={() => setModal(null)} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-600 text-sm hover:bg-slate-50">إلغاء</button>
+            <button
+              onClick={() => { selected && openWhatsApp(selected); setModal(null) }}
+              className="px-4 py-2 rounded-lg bg-green-600 text-white text-sm font-medium hover:bg-green-700 flex items-center gap-2"
+            >
+              <MessageCircle size={15} />
+              فتح واتساب
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Payment */}
       <Modal open={modal === 'payment'} onClose={() => setModal(null)} title={`تسجيل دفعة — ${selected?.name}`} size="sm">
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
-            رصيد الدين: <strong>{formatCurrency(selected?.balance_owed ?? 0, 'USD')}</strong>
-            <span className="text-xs mr-1">= {formatCurrency((selected?.balance_owed ?? 0) * IQD_RATE, 'IQD')}</span>
+            رصيد الدين: <strong>{formatCurrency((selected?.balance_owed ?? 0) * IQD_RATE, 'IQD')}</strong>
+            <span className="text-xs mr-1">({formatCurrency(selected?.balance_owed ?? 0, 'USD')})</span>
           </div>
           <Input label="المبلغ المدفوع *" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} />
           <div className="grid grid-cols-2 gap-3">

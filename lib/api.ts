@@ -486,6 +486,50 @@ export async function deleteExpense(id: string) {
   if (error) throw error
 }
 
+export async function fetchNotifications(): Promise<{
+  low_stock: { quantity: number; min_quantity: number; products: { name: string } | null }[]
+  upcoming_installments: { id: string; due_date: string; amount: number; sales: { currency: string; exchange_rate: number; customers: { name: string; phone: string | null } | null } | null }[]
+}> {
+  const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const today = new Date().toISOString().split('T')[0]
+
+  const [{ data: invData }, { data: installData }] = await Promise.all([
+    supabase
+      .from('inventory')
+      .select('quantity, min_quantity, products(name)')
+      .is('deleted_at', null),
+    supabase
+      .from('installments')
+      .select('id, due_date, amount, sales(currency, exchange_rate, customers(name, phone))')
+      .eq('status', 'معلق')
+      .gte('due_date', today)
+      .lte('due_date', nextWeek)
+      .order('due_date')
+      .limit(20),
+  ])
+
+  return {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    low_stock: ((invData ?? []) as any[])
+      .filter((i: { quantity: number; min_quantity: number }) => i.quantity <= i.min_quantity)
+      .map((i: { quantity: number; min_quantity: number; products: { name: string } | { name: string }[] | null }) => ({
+        quantity: i.quantity,
+        min_quantity: i.min_quantity,
+        products: Array.isArray(i.products) ? (i.products[0] ?? null) : i.products,
+      })),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    upcoming_installments: ((installData ?? []) as any[]).map((i: {
+      id: string; due_date: string; amount: number;
+      sales: { currency: string; exchange_rate: number; customers: { name: string; phone: string | null } | null } | { currency: string; exchange_rate: number; customers: { name: string; phone: string | null } | null }[] | null
+    }) => ({
+      id: i.id,
+      due_date: i.due_date,
+      amount: i.amount,
+      sales: Array.isArray(i.sales) ? (i.sales[0] ?? null) : i.sales,
+    })),
+  }
+}
+
 export async function fetchFinancialSummary() {
   const IQD_RATE = 1310
   const [sales, saleItems, expenses, inventory, customers, suppliers] = await Promise.all([

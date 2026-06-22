@@ -38,7 +38,7 @@ export default function SalesPage() {
   const [deleting, setDeleting] = useState(false)
 
   // Form state
-  const [currency, setCurrency] = useState<Currency>('USD')
+  const [currency, setCurrency] = useState<Currency>('IQD')
   const [paymentType, setPaymentType] = useState<PaymentType>('نقد')
   const [customerId, setCustomerId] = useState('')
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
@@ -68,7 +68,7 @@ export default function SalesPage() {
   }
 
   function openNew() {
-    setCurrency('USD'); setPaymentType('نقد'); setCustomerId(''); setSaleDate(new Date().toISOString().split('T')[0])
+    setCurrency('IQD'); setPaymentType('نقد'); setCustomerId(''); setSaleDate(new Date().toISOString().split('T')[0])
     setNote(''); setAmountPaid(''); setDownPayment(''); setInstallmentCount('3')
     setItems([{ product_id: '', quantity: '', unit_price: '' }])
     setModalOpen(true)
@@ -269,15 +269,52 @@ export default function SalesPage() {
               options={[{ value: 'نقد', label: 'نقد' }, { value: 'دين', label: 'دين (آجل)' }, { value: 'أقساط', label: 'أقساط' }]} />
           </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
+          {/* Mobile: card layout */}
+          <div className="md:hidden space-y-3">
+            {items.map((item, idx) => {
+              const lineTotal = parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')
+              return (
+                <div key={idx} className="border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50/50">
+                  <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)}>
+                    <option value="">اختر منتج...</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
+                  </select>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">الكمية</label>
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">سعر الوحدة</label>
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">المجموع</label>
+                      <div className="py-2 text-sm font-semibold text-blue-700">{lineTotal.toFixed(currency === 'IQD' ? 0 : 2)}</div>
+                    </div>
+                  </div>
+                  {items.length > 1 && (
+                    <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium">× حذف الصنف</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop: table layout */}
+          <div className="hidden md:block border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium text-slate-600">المنتج</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">الكمية</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">سعر الوحدة</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">المجموع</th>
-                  <th className="px-3 py-2"></th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-600 w-24">الكمية</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-600 w-32">سعر الوحدة</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-600 w-28">المجموع</th>
+                  <th className="px-3 py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody>
@@ -291,15 +328,15 @@ export default function SalesPage() {
                       </select>
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" step="0.01" className="w-20 border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} placeholder="0" />
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" step="0.01" className="w-28 border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} placeholder="0.00" />
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} placeholder="0" />
                     </td>
                     <td className="px-3 py-2 font-semibold text-slate-800">
-                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(2)}
+                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(currency === 'IQD' ? 0 : 2)}
                     </td>
                     <td className="px-3 py-2">
                       {items.length > 1 && (

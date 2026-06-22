@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Tajawal } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/lib/auth'
@@ -11,8 +11,22 @@ const tajawal = Tajawal({
 })
 
 export const metadata: Metadata = {
-  title: 'نظام محاسبة المواد الغذائية والكهربائية',
+  title: 'نظام المحاسبة',
   description: 'نظام متكامل لإدارة المخزون والمبيعات',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'محاسبة',
+  },
+  icons: {
+    icon: '/icon-192.png',
+    apple: '/apple-touch-icon.png',
+  },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#2563eb',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

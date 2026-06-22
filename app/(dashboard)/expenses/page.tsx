@@ -17,7 +17,7 @@ const emptyForm = {
   category: CATEGORIES[0],
   description: '',
   amount: '',
-  currency: 'USD' as 'USD' | 'IQD',
+  currency: 'IQD' as 'USD' | 'IQD',
   expense_date: new Date().toISOString().split('T')[0],
   note: '',
 }
@@ -69,15 +69,20 @@ export default function ExpensesPage() {
     setExpenses(prev => prev.filter(e => e.id !== id))
   }
 
+  const toIQD = (e: Expense) =>
+    e.currency === 'IQD' ? e.amount : e.amount * e.exchange_rate
+
   const toUSD = (e: Expense) =>
     e.currency === 'USD' ? e.amount : e.amount / e.exchange_rate
 
+  const totalIQD = expenses.reduce((s, e) => s + toIQD(e), 0)
   const totalUSD = expenses.reduce((s, e) => s + toUSD(e), 0)
 
   const byCategory = CATEGORIES.map(cat => ({
     cat,
-    total: expenses.filter(e => e.category === cat).reduce((s, e) => s + toUSD(e), 0),
-  })).filter(x => x.total > 0)
+    totalIQD: expenses.filter(e => e.category === cat).reduce((s, e) => s + toIQD(e), 0),
+    totalUSD: expenses.filter(e => e.category === cat).reduce((s, e) => s + toUSD(e), 0),
+  })).filter(x => x.totalIQD > 0)
 
   return (
     <DashboardLayout
@@ -98,24 +103,24 @@ export default function ExpensesPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="card text-center col-span-1">
             <BarChart3 size={24} className="text-red-500 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalUSD, 'USD')}</div>
-            <div className="text-sm text-slate-500">إجمالي المصاريف $</div>
-            <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalUSD * IQD_RATE, 'IQD')}</div>
+            <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalIQD, 'IQD')}</div>
+            <div className="text-sm text-slate-500">إجمالي المصاريف</div>
+            <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalUSD, 'USD')}</div>
           </div>
           <div className="card col-span-2">
             <div className="text-sm font-medium text-slate-700 mb-3">توزيع حسب الفئة</div>
             <div className="space-y-2">
               {byCategory.length === 0 && <p className="text-slate-400 text-sm">لا توجد بيانات</p>}
-              {byCategory.map(({ cat, total }) => (
+              {byCategory.map(({ cat, totalIQD: catIQD }) => (
                 <div key={cat} className="flex items-center gap-2">
                   <div className="text-sm text-slate-600 w-32 shrink-0">{cat}</div>
                   <div className="flex-1 bg-slate-100 rounded-full h-2 overflow-hidden">
                     <div
                       className="bg-red-400 h-full rounded-full"
-                      style={{ width: totalUSD > 0 ? `${(total / totalUSD) * 100}%` : '0%' }}
+                      style={{ width: totalIQD > 0 ? `${(catIQD / totalIQD) * 100}%` : '0%' }}
                     />
                   </div>
-                  <div className="text-sm font-medium text-slate-700 w-24 text-left">{formatCurrency(total, 'USD')}</div>
+                  <div className="text-sm font-medium text-slate-700 w-28 text-left">{formatCurrency(catIQD, 'IQD')}</div>
                 </div>
               ))}
             </div>
@@ -131,7 +136,7 @@ export default function ExpensesPage() {
                 <Th>الفئة</Th>
                 <Th>الوصف</Th>
                 <Th>المبلغ</Th>
-                <Th>المبلغ $</Th>
+                <Th>بالدينار</Th>
                 <Th>ملاحظة</Th>
                 <Th></Th>
               </tr>
@@ -147,7 +152,7 @@ export default function ExpensesPage() {
                   <Td><Badge variant="warning">{e.category}</Badge></Td>
                   <Td className="font-medium">{e.description}</Td>
                   <Td>{formatCurrency(e.amount, e.currency)}</Td>
-                  <Td className="text-slate-600">{formatCurrency(toUSD(e), 'USD')}</Td>
+                  <Td className="font-medium text-slate-800">{formatCurrency(toIQD(e), 'IQD')}</Td>
                   <Td className="text-slate-400 text-xs">{e.note ?? '—'}</Td>
                   <Td>
                     <button onClick={() => handleDelete(e.id)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-500">

@@ -183,10 +183,11 @@ export default function ReportsPage() {
 
         {/* Debts */}
         {tab === 'debts' && (
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="card">
               <h3 className="font-semibold text-slate-800 mb-3">ديون الزبائن</h3>
-              <div className="text-2xl font-bold text-red-600 mb-4">{formatCurrency(totalCustomerDebt, 'USD')}</div>
+              <div className="text-2xl font-bold text-red-600 mb-1">{formatCurrency(totalCustomerDebt * IQD_RATE, 'IQD')}</div>
+              <div className="text-xs text-slate-400 mb-4">{formatCurrency(totalCustomerDebt, 'USD')}</div>
               <div className="space-y-2">
                 {debts.customers.map(c => (
                   <div key={c.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
@@ -194,7 +195,10 @@ export default function ReportsPage() {
                       <div className="font-medium">{c.name}</div>
                       {c.phone && <div className="text-xs text-slate-400">{c.phone}</div>}
                     </div>
-                    <div className="font-semibold text-red-600">{formatCurrency(c.balance_owed, 'USD')}</div>
+                    <div className="text-left">
+                      <div className="font-semibold text-red-600">{formatCurrency(c.balance_owed * IQD_RATE, 'IQD')}</div>
+                      <div className="text-xs text-slate-400">{formatCurrency(c.balance_owed, 'USD')}</div>
+                    </div>
                   </div>
                 ))}
                 {debts.customers.length === 0 && <p className="text-slate-400 text-sm text-center py-4">لا توجد ديون</p>}
@@ -202,7 +206,8 @@ export default function ReportsPage() {
             </div>
             <div className="card">
               <h3 className="font-semibold text-slate-800 mb-3">مستحقات الموردين</h3>
-              <div className="text-2xl font-bold text-purple-600 mb-4">{formatCurrency(totalSupplierDebt, 'USD')}</div>
+              <div className="text-2xl font-bold text-purple-600 mb-1">{formatCurrency(totalSupplierDebt * IQD_RATE, 'IQD')}</div>
+              <div className="text-xs text-slate-400 mb-4">{formatCurrency(totalSupplierDebt, 'USD')}</div>
               <div className="space-y-2">
                 {debts.suppliers.map(s => (
                   <div key={s.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
@@ -231,7 +236,7 @@ export default function ReportsPage() {
                 <Thead>
                   <tr>
                     <Th>المنتج</Th><Th>الفئة</Th><Th>الوحدة</Th><Th>الكمية</Th>
-                    <Th>حد التنبيه</Th><Th>سعر البيع $</Th><Th>الحالة</Th>
+                    <Th>حد التنبيه</Th><Th>سعر البيع</Th><Th>الحالة</Th>
                   </tr>
                 </Thead>
                 <Tbody>
@@ -248,7 +253,11 @@ export default function ReportsPage() {
                         <Td>{item.products?.unit}</Td>
                         <Td className={`font-semibold ${isLow ? 'text-red-600' : 'text-slate-900'}`}>{item.quantity}</Td>
                         <Td className="text-slate-500">{item.min_quantity}</Td>
-                        <Td>{formatCurrency(item.products?.sale_price_usd ?? 0, 'USD')}</Td>
+                        <Td>{(() => {
+                          const cur = (item.products?.price_currency ?? 'USD') as 'USD' | 'IQD'
+                          const priceUSD = item.products?.sale_price_usd ?? 0
+                          return formatCurrency(cur === 'IQD' ? priceUSD * IQD_RATE : priceUSD, cur)
+                        })()}</Td>
                         <Td><Badge variant={isLow ? 'danger' : 'success'}>{isLow ? 'منخفض' : 'جيد'}</Badge></Td>
                       </Tr>
                     )
