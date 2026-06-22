@@ -56,7 +56,7 @@ export default function SuppliersPage() {
     setOrders(data as PurchaseOrder[])
   }
 
-  async function saveSuppiler() {
+  async function saveSupplier() {
     if (!supForm.name) return
     setSaving(true)
     if (selected) {
@@ -198,7 +198,7 @@ export default function SuppliersPage() {
             options={[{ value: 'USD', label: 'دولار أمريكي' }, { value: 'IQD', label: 'دينار عراقي' }]} />
           <div className="flex gap-3 justify-end pt-2">
             <Button variant="outline" onClick={() => setModal(null)}>إلغاء</Button>
-            <Button onClick={saveSuppiler} loading={saving}>{modal === 'edit-supplier' ? 'حفظ' : 'إضافة'}</Button>
+            <Button onClick={saveSupplier} loading={saving}>{modal === 'edit-supplier' ? 'حفظ' : 'إضافة'}</Button>
           </div>
         </div>
       </Modal>
@@ -243,7 +243,7 @@ export default function SuppliersPage() {
                         value={item.unit_price} onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, unit_price: e.target.value } : it))} placeholder="0.00" />
                     </td>
                     <td className="px-3 py-2 font-medium">
-                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(2)}
+                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(orderCurrency === 'IQD' ? 0 : 2)}
                     </td>
                     <td className="px-3 py-2">
                       {orderItems.length > 1 && (
@@ -261,7 +261,7 @@ export default function SuppliersPage() {
               <Plus size={14} />إضافة صنف
             </Button>
             <div className="text-lg font-bold text-slate-900">
-              المجموع: {orderTotal().toFixed(2)} {orderCurrency}
+              المجموع: {formatCurrency(orderTotal(), orderCurrency)}
               {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</span>}
             </div>
           </div>
@@ -269,7 +269,7 @@ export default function SuppliersPage() {
           {parseFloat(amountPaid) > 0 && (
             <div className="text-sm bg-slate-50 p-3 rounded-lg">
               <span className="text-slate-600">المتبقي: </span>
-              <strong className="text-red-600">{(orderTotal() - parseFloat(amountPaid)).toFixed(2)} {orderCurrency}</strong>
+              <strong className="text-red-600">{formatCurrency(orderTotal() - parseFloat(amountPaid), orderCurrency)}</strong>
             </div>
           )}
 
@@ -315,9 +315,9 @@ export default function SuppliersPage() {
                 {statusBadge(o.status)}
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm text-slate-600">
-                <div>المجموع: <strong>{o.total_amount.toFixed(2)} {o.currency}</strong></div>
-                <div>المدفوع: <strong className="text-green-600">{o.amount_paid.toFixed(2)} {o.currency}</strong></div>
-                <div>المتبقي: <strong className="text-red-600">{(o.total_amount - o.amount_paid).toFixed(2)} {o.currency}</strong></div>
+                <div>المجموع: <strong>{formatCurrency(o.total_amount, o.currency as 'USD' | 'IQD')}</strong></div>
+                <div>المدفوع: <strong className="text-green-600">{formatCurrency(o.amount_paid, o.currency as 'USD' | 'IQD')}</strong></div>
+                <div>المتبقي: <strong className="text-red-600">{formatCurrency(o.total_amount - o.amount_paid, o.currency as 'USD' | 'IQD')}</strong></div>
               </div>
               {o.note && <p className="text-xs text-slate-400 mt-2">{o.note}</p>}
             </div>

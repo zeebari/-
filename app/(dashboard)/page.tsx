@@ -200,9 +200,9 @@ export default function DashboardPage() {
                   <div>
                     <p className="text-sm text-blue-600 font-medium mb-1">المبلغ المداور</p>
                     <p className={`text-xl font-bold ${workingCapital >= 0 ? 'text-blue-700' : 'text-red-600'}`}>
-                      {formatCurrency(Math.abs(workingCapital) * IQD_RATE, 'IQD')}
+                      {workingCapital < 0 ? '-' : ''}{formatCurrency(Math.abs(workingCapital) * IQD_RATE, 'IQD')}
                     </p>
-                    <p className="text-xs text-slate-400 mt-1">{formatCurrency(workingCapital, 'USD')}</p>
+                    <p className="text-xs text-slate-400 mt-1">{workingCapital < 0 ? '-' : ''}{formatCurrency(Math.abs(workingCapital), 'USD')}</p>
                   </div>
                   <div className="p-3 rounded-xl bg-blue-100">
                     <BarChart3 size={22} className="text-blue-700" />

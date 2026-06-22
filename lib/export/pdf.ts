@@ -145,7 +145,7 @@ export async function exportInventoryToPdf(
     <thead><tr>
       <th>المنتج</th><th>الفئة</th><th>الوحدة</th>
       <th>الكمية</th><th>حد التنبيه</th>
-      <th>سعر التكلفة</th><th>سعر البيع $</th><th>الحالة</th>
+      <th>سعر التكلفة</th><th>سعر البيع</th><th>الحالة</th>
     </tr></thead>
     <tbody>${rows}</tbody>
   </table>
@@ -156,6 +156,11 @@ export async function exportInventoryToPdf(
     <span>${date}</span>
   </div>
 </div>`, 'تقرير المخزون')
+}
+
+function fmtAmt(amount: number, currency: string): string {
+  if (currency === 'IQD') return amount.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' د.ع'
+  return '$' + amount.toFixed(2)
 }
 
 export async function exportSaleToPdf(sale: {
@@ -173,14 +178,14 @@ export async function exportSaleToPdf(sale: {
   const itemRows = sale.items.map(i => `<tr>
     <td>${i.product_name}</td>
     <td class="num" style="text-align:center">${i.quantity}</td>
-    <td class="num">${i.unit_price.toFixed(2)} ${sale.currency}</td>
-    <td class="num" style="font-weight:700">${i.total.toFixed(2)} ${sale.currency}</td>
+    <td class="num">${fmtAmt(i.unit_price, sale.currency)}</td>
+    <td class="num" style="font-weight:700">${fmtAmt(i.total, sale.currency)}</td>
   </tr>`).join('')
 
   const instRows = (sale.installments ?? []).map((inst, i) => `<tr>
     <td>قسط ${i + 1}</td>
     <td>${new Date(inst.due_date).toLocaleDateString('en-US')}</td>
-    <td class="num">${inst.amount.toFixed(2)} ${sale.currency}</td>
+    <td class="num">${fmtAmt(inst.amount, sale.currency)}</td>
     <td class="${inst.status === 'مدفوع' ? 'ok' : 'low'}">${inst.status}</td>
   </tr>`).join('')
 
@@ -223,10 +228,10 @@ export async function exportSaleToPdf(sale: {
   </table>
 
   <div class="totals">
-    <div class="total-row"><span>المجموع</span><span class="num">${sale.total_amount.toFixed(2)} ${sale.currency}</span></div>
-    <div class="total-row" style="color:#16a34a"><span>المدفوع</span><span class="num">${sale.amount_paid.toFixed(2)} ${sale.currency}</span></div>
+    <div class="total-row"><span>المجموع</span><span class="num">${fmtAmt(sale.total_amount, sale.currency)}</span></div>
+    <div class="total-row" style="color:#16a34a"><span>المدفوع</span><span class="num">${fmtAmt(sale.amount_paid, sale.currency)}</span></div>
     <div class="total-row grand" style="color:${remaining > 0 ? '#dc2626' : '#16a34a'}">
-      <span>المتبقي</span><span class="num">${remaining.toFixed(2)} ${sale.currency}</span>
+      <span>المتبقي</span><span class="num">${fmtAmt(remaining, sale.currency)}</span>
     </div>
   </div>
 

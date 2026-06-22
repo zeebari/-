@@ -141,7 +141,7 @@ export default function InventoryPage() {
                 <Th>الوحدة</Th>
                 <Th>الكمية</Th>
                 <Th>حد التنبيه</Th>
-                <Th>سعر البيع $</Th>
+                <Th>سعر البيع</Th>
                 <Th>سعر البيع د.ع</Th>
                 <Th>الحالة</Th>
                 <Th>الموقع</Th>

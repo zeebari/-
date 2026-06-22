@@ -264,9 +264,9 @@ export default function CustomersPage() {
                 {statusBadge(s.status)}
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm text-slate-600">
-                <div>المجموع: <strong>{s.total_amount.toFixed(2)} {s.currency}</strong></div>
-                <div>المدفوع: <strong className="text-green-600">{s.amount_paid.toFixed(2)} {s.currency}</strong></div>
-                <div>المتبقي: <strong className="text-red-600">{(s.total_amount - s.amount_paid).toFixed(2)} {s.currency}</strong></div>
+                <div>المجموع: <strong>{formatCurrency(s.total_amount, s.currency as 'USD' | 'IQD')}</strong></div>
+                <div>المدفوع: <strong className="text-green-600">{formatCurrency(s.amount_paid, s.currency as 'USD' | 'IQD')}</strong></div>
+                <div>المتبقي: <strong className="text-red-600">{formatCurrency(s.total_amount - s.amount_paid, s.currency as 'USD' | 'IQD')}</strong></div>
               </div>
             </div>
           ))}

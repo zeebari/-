@@ -404,12 +404,12 @@ export default function SalesPage() {
               </div>
               {subtotal > 0 && (
                 <div className="text-sm text-slate-600 space-y-1">
-                  <div>المبلغ المتبقي بعد الدفعة الأولى: <strong>{(subtotal - parseFloat(downPayment || '0')).toFixed(2)} {currency}</strong></div>
-                  <div>قيمة كل قسط: <strong>{((subtotal - parseFloat(downPayment || '0')) / (parseInt(installmentCount) || 1)).toFixed(2)} {currency}</strong></div>
+                  <div>المبلغ المتبقي بعد الدفعة الأولى: <strong>{formatCurrency(subtotal - parseFloat(downPayment || '0'), currency)}</strong></div>
+                  <div>قيمة كل قسط: <strong>{formatCurrency((subtotal - parseFloat(downPayment || '0')) / (parseInt(installmentCount) || 1), currency)}</strong></div>
                   <div className="mt-2 font-medium text-slate-700">مواعيد الأقساط:</div>
                   {generateInstallments().map((inst, i) => (
                     <div key={i} className="text-xs text-slate-500">
-                      قسط {i + 1}: {inst.due_date} — {inst.amount.toFixed(2)} {currency}
+                      قسط {i + 1}: {inst.due_date} — {formatCurrency(inst.amount, currency)}
                     </div>
                   ))}
                 </div>
@@ -455,17 +455,17 @@ export default function SalesPage() {
                   <Tr key={si.id}>
                     <Td>{si.products?.name}</Td>
                     <Td>{si.quantity}</Td>
-                    <Td>{si.unit_price.toFixed(2)}</Td>
-                    <Td className="font-semibold">{si.total.toFixed(2)}</Td>
+                    <Td>{formatCurrency(si.unit_price, detailSale.currency as Currency)}</Td>
+                    <Td className="font-semibold">{formatCurrency(si.total, detailSale.currency as Currency)}</Td>
                   </Tr>
                 ))}
               </Tbody>
             </Table>
 
             <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-2">
-              <div className="flex justify-between"><span>المجموع:</span><strong>{detailSale.total_amount.toFixed(2)} {detailSale.currency}</strong></div>
-              <div className="flex justify-between text-green-600"><span>المدفوع:</span><strong>{detailSale.amount_paid.toFixed(2)} {detailSale.currency}</strong></div>
-              <div className="flex justify-between text-red-600"><span>المتبقي:</span><strong>{(detailSale.total_amount - detailSale.amount_paid).toFixed(2)} {detailSale.currency}</strong></div>
+              <div className="flex justify-between"><span>المجموع:</span><strong>{formatCurrency(detailSale.total_amount, detailSale.currency as Currency)}</strong></div>
+              <div className="flex justify-between text-green-600"><span>المدفوع:</span><strong>{formatCurrency(detailSale.amount_paid, detailSale.currency as Currency)}</strong></div>
+              <div className="flex justify-between text-red-600"><span>المتبقي:</span><strong>{formatCurrency(detailSale.total_amount - detailSale.amount_paid, detailSale.currency as Currency)}</strong></div>
               {detailSale.currency === 'USD' && (
                 <div className="flex justify-between text-slate-500 text-xs pt-1 border-t border-slate-200">
                   <span>المجموع بالدينار:</span>
