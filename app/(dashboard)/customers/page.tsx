@@ -7,13 +7,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, Pencil, CreditCard, History } from 'lucide-react'
+import { Plus, Pencil, CreditCard, History, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Customer, Sale } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
 import { IQD_RATE } from '@/lib/config'
 import {
   fetchCustomers, fetchSales,
-  createCustomer, updateCustomer, createCustomerPayment,
+  createCustomer, updateCustomer, deleteCustomer, createCustomerPayment,
 } from '@/lib/api'
 
 type ModalType = 'add' | 'edit' | 'payment' | 'history' | null
@@ -25,6 +26,8 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState<ModalType>(null)
   const [selected, setSelected] = useState<Customer | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Customer | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', address: '' })
   const [payForm, setPayForm] = useState({ amount: '', currency: 'USD', note: '', sale_id: '', payment_date: new Date().toISOString().split('T')[0] })
 
@@ -51,6 +54,15 @@ export default function CustomersPage() {
       await createCustomer(form)
     }
     await loadData(); setModal(null); setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteCustomer(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
   }
 
   async function savePayment() {
@@ -124,6 +136,10 @@ export default function CustomersPage() {
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" title="السجل">
                       <History size={14} />
                     </button>
+                    <button onClick={() => setDeleteTarget(c)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                      <Trash2 size={14} />
+                    </button>
                   </div>
                 </Td>
               </Tr>
@@ -196,6 +212,14 @@ export default function CustomersPage() {
           ))}
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف زبون"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.name}"؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }

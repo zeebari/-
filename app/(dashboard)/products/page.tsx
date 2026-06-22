@@ -34,7 +34,7 @@ export default function ProductsPage() {
   const [editTarget, setEditTarget] = useState<Product | null>(null)
   const [form, setForm] = useState({
     name: '', category_id: '', unit: 'قطعة',
-    cost_price_usd: '', sale_price_usd: '', barcode: '', description: '',
+    cost_price_usd: '', sale_price_usd: '', barcode: '', description: '', initial_quantity: '',
   })
 
   useEffect(() => { loadData() }, [])
@@ -50,7 +50,7 @@ export default function ProductsPage() {
   function openAdd() {
     setEditTarget(null)
     setPriceCurrency('USD')
-    setForm({ name: '', category_id: '', unit: 'قطعة', cost_price_usd: '', sale_price_usd: '', barcode: '', description: '' })
+    setForm({ name: '', category_id: '', unit: 'قطعة', cost_price_usd: '', sale_price_usd: '', barcode: '', description: '', initial_quantity: '' })
     setModalOpen(true)
   }
 
@@ -65,6 +65,7 @@ export default function ProductsPage() {
       sale_price_usd: String(p.sale_price_usd),
       barcode: p.barcode ?? '',
       description: p.description ?? '',
+      initial_quantity: '',
     })
     setModalOpen(true)
   }
@@ -81,9 +82,11 @@ export default function ProductsPage() {
       price_currency: priceCurrency,
       barcode: form.barcode || null,
       description: form.description || null,
+      initial_quantity: parseFloat(form.initial_quantity) || 0,
     }
     if (editTarget) {
-      await updateProduct(editTarget.id, payload)
+      const { initial_quantity: _iq, ...updatePayload } = payload
+      await updateProduct(editTarget.id, updatePayload)
     } else {
       await createProduct(payload)
     }
@@ -244,6 +247,15 @@ export default function ProductsPage() {
                 : <>المعادل: <strong>${(parseFloat(form.sale_price_usd || '0') / IQD_RATE).toFixed(2)}</strong></>
               }
             </div>
+          )}
+          {!editTarget && (
+            <Input
+              label="عدد القطع (الكمية الأولية)"
+              type="number" step="1" min="0"
+              value={form.initial_quantity}
+              onChange={e => setForm(f => ({ ...f, initial_quantity: e.target.value }))}
+              placeholder="0"
+            />
           )}
           <Input label="الباركود" value={form.barcode} onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))} placeholder="اختياري" />
           <Textarea label="الوصف" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="وصف اختياري" />

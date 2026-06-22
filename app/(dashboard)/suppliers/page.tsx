@@ -8,13 +8,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, Pencil, ShoppingBag, CreditCard } from 'lucide-react'
+import { Plus, Pencil, ShoppingBag, CreditCard, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Supplier, PurchaseOrder, Product } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
 import { IQD_RATE } from '@/lib/config'
 import {
   fetchSuppliers, fetchProducts,
-  createSupplier, updateSupplier,
+  createSupplier, updateSupplier, deleteSupplier,
   fetchPurchaseOrders, createPurchaseOrder, createSupplierPayment,
 } from '@/lib/api'
 
@@ -28,6 +29,8 @@ export default function SuppliersPage() {
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState<ModalType>(null)
   const [selected, setSelected] = useState<Supplier | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [supForm, setSupForm] = useState({ name: '', phone: '', address: '', currency: 'USD' })
   const [orderItems, setOrderItems] = useState<{ product_id: string; quantity: string; unit_price: string }[]>([{ product_id: '', quantity: '', unit_price: '' }])
@@ -62,6 +65,15 @@ export default function SuppliersPage() {
       await createSupplier(supForm)
     }
     await loadData(); setModal(null); setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteSupplier(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
   }
 
   async function saveOrder() {
@@ -163,6 +175,10 @@ export default function SuppliersPage() {
                     <button onClick={() => { setSelected(s); loadOrders(s.id); setModal('history') }}
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 text-xs px-2" title="السجل">
                       سجل
+                    </button>
+                    <button onClick={() => setDeleteTarget(s)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </Td>
@@ -308,6 +324,14 @@ export default function SuppliersPage() {
           ))}
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف مورد"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.name}"؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }

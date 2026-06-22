@@ -54,6 +54,11 @@ export async function updateCustomer(id: string, body: { name: string; phone?: s
   return data
 }
 
+export async function deleteCustomer(id: string) {
+  const { error } = await supabase.from('customers').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
+}
+
 export async function createCustomerPayment(body: {
   customer_id: string
   sale_id?: string | null
@@ -175,9 +180,17 @@ export async function createProduct(body: {
   price_currency?: string
   barcode?: string | null
   description?: string | null
+  initial_quantity?: number
 }) {
-  const { data, error } = await supabase.from('products').insert(body).select().single()
+  const { initial_quantity, ...productBody } = body
+  const { data, error } = await supabase.from('products').insert(productBody).select().single()
   if (error) throw error
+  if (data && (initial_quantity ?? 0) > 0) {
+    await supabase.from('inventory').upsert(
+      { product_id: data.id, quantity: initial_quantity, updated_at: new Date().toISOString() },
+      { onConflict: 'product_id' }
+    )
+  }
   return data
 }
 
@@ -212,6 +225,11 @@ export async function updateSupplier(id: string, body: object) {
   const { data, error } = await supabase.from('suppliers').update(body).eq('id', id).select().single()
   if (error) throw error
   return data
+}
+
+export async function deleteSupplier(id: string) {
+  const { error } = await supabase.from('suppliers').update({ deleted_at: new Date().toISOString() }).eq('id', id)
+  if (error) throw error
 }
 
 export async function fetchPurchaseOrders(supplierId: string) {
