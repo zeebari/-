@@ -92,6 +92,7 @@ export default function InventoryPage() {
         min_quantity: i.min_quantity,
         cost_price_usd: i.products?.cost_price_usd ?? 0,
         sale_price_usd: i.products?.sale_price_usd ?? 0,
+        price_currency: i.products?.price_currency ?? 'USD',
       }))
     )
   }

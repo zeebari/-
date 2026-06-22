@@ -127,9 +127,16 @@ export async function createCustomerPayment(body: {
   await supabase.from('customers').update({ balance_owed: Math.max(0, (cust?.balance_owed ?? 0) - amtUSD) }).eq('id', body.customer_id)
 
   if (body.sale_id) {
-    const { data: sale } = await supabase.from('sales').select('total_amount, amount_paid').eq('id', body.sale_id).single()
+    const { data: sale } = await supabase.from('sales').select('total_amount, amount_paid, currency, exchange_rate').eq('id', body.sale_id).single()
     if (sale) {
-      const newPaid = sale.amount_paid + body.amount
+      let amtInSaleCur = body.amount
+      if (body.currency !== sale.currency) {
+        const rate = body.exchange_rate || sale.exchange_rate || 1310
+        amtInSaleCur = body.currency === 'USD'
+          ? body.amount * rate
+          : body.amount / rate
+      }
+      const newPaid = sale.amount_paid + amtInSaleCur
       await supabase.from('sales').update({
         amount_paid: newPaid,
         status: newPaid >= sale.total_amount ? 'مدفوع' : 'جزئي',
@@ -211,7 +218,7 @@ export async function createSale(body: {
 
   if (saleData.customer_id && status !== 'مدفوع') {
     const remaining = saleData.total_amount - (saleData.amount_paid ?? 0)
-    const remainingUSD = saleData.currency === 'USD' ? remaining : remaining / saleData.exchange_rate
+    const remainingUSD = saleData.currency === 'USD' ? remaining : remaining / (saleData.exchange_rate || 1310)
     const { data: cust } = await supabase.from('customers').select('balance_owed').eq('id', saleData.customer_id).single()
     await supabase.from('customers').update({ balance_owed: (cust?.balance_owed ?? 0) + remainingUSD }).eq('id', saleData.customer_id)
   }
@@ -333,8 +340,14 @@ export async function createPurchaseOrder(body: {
 
   if (orderData.supplier_id) {
     const remaining = orderData.total_amount - (orderData.amount_paid ?? 0)
-    const { data: sup } = await supabase.from('suppliers').select('balance_owed').eq('id', orderData.supplier_id).single()
-    await supabase.from('suppliers').update({ balance_owed: (sup?.balance_owed ?? 0) + remaining }).eq('id', orderData.supplier_id)
+    const { data: sup } = await supabase.from('suppliers').select('balance_owed, currency').eq('id', orderData.supplier_id).single()
+    const supCur = sup?.currency ?? 'USD'
+    let remainingInSupCur = remaining
+    if (orderData.currency !== supCur) {
+      const rate = orderData.exchange_rate || 1310
+      remainingInSupCur = orderData.currency === 'USD' ? remaining * rate : remaining / rate
+    }
+    await supabase.from('suppliers').update({ balance_owed: (sup?.balance_owed ?? 0) + remainingInSupCur }).eq('id', orderData.supplier_id)
   }
 
   return order
@@ -352,13 +365,24 @@ export async function createSupplierPayment(body: {
   const { data: payment, error } = await supabase.from('supplier_payments').insert(body).select().single()
   if (error) throw error
 
-  const { data: sup } = await supabase.from('suppliers').select('balance_owed').eq('id', body.supplier_id).single()
-  await supabase.from('suppliers').update({ balance_owed: Math.max(0, (sup?.balance_owed ?? 0) - body.amount) }).eq('id', body.supplier_id)
+  const { data: sup } = await supabase.from('suppliers').select('balance_owed, currency').eq('id', body.supplier_id).single()
+  const supCur = sup?.currency ?? 'USD'
+  let amtInSupCur = body.amount
+  if (body.currency !== supCur) {
+    const rate = body.exchange_rate || 1310
+    amtInSupCur = body.currency === 'USD' ? body.amount * rate : body.amount / rate
+  }
+  await supabase.from('suppliers').update({ balance_owed: Math.max(0, (sup?.balance_owed ?? 0) - amtInSupCur) }).eq('id', body.supplier_id)
 
   if (body.purchase_order_id) {
-    const { data: po } = await supabase.from('purchase_orders').select('total_amount, amount_paid').eq('id', body.purchase_order_id).single()
+    const { data: po } = await supabase.from('purchase_orders').select('total_amount, amount_paid, currency, exchange_rate').eq('id', body.purchase_order_id).single()
     if (po) {
-      const newPaid = po.amount_paid + body.amount
+      let amtInPoCur = body.amount
+      if (body.currency !== po.currency) {
+        const rate = body.exchange_rate || po.exchange_rate || 1310
+        amtInPoCur = body.currency === 'USD' ? body.amount * rate : body.amount / rate
+      }
+      const newPaid = po.amount_paid + amtInPoCur
       await supabase.from('purchase_orders').update({
         amount_paid: newPaid,
         status: newPaid >= po.total_amount ? 'مدفوع' : 'جزئي',

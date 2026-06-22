@@ -105,6 +105,7 @@ export default function ReportsPage() {
       min_quantity: i.min_quantity,
       cost_price_usd: i.products?.cost_price_usd ?? 0,
       sale_price_usd: i.products?.sale_price_usd ?? 0,
+      price_currency: i.products?.price_currency ?? 'USD',
     })))
   }
 
@@ -254,11 +255,10 @@ export default function ReportsPage() {
                         <Td>{item.products?.unit}</Td>
                         <Td className={`font-semibold ${isLow ? 'text-red-600' : 'text-slate-900'}`}>{item.quantity}</Td>
                         <Td className="text-slate-500">{item.min_quantity}</Td>
-                        <Td>{(() => {
-                          const cur = (item.products?.price_currency ?? 'USD') as 'USD' | 'IQD'
-                          const priceUSD = item.products?.sale_price_usd ?? 0
-                          return formatCurrency(cur === 'IQD' ? priceUSD * IQD_RATE : priceUSD, cur)
-                        })()}</Td>
+                        <Td>{formatCurrency(
+                          item.products?.sale_price_usd ?? 0,
+                          (item.products?.price_currency ?? 'USD') as 'USD' | 'IQD'
+                        )}</Td>
                         <Td><Badge variant={isLow ? 'danger' : 'success'}>{isLow ? 'منخفض' : 'جيد'}</Badge></Td>
                       </Tr>
                     )

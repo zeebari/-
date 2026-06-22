@@ -107,9 +107,15 @@ export async function exportInventoryToPdf(
     name: string; category: string; unit: string
     quantity: number; min_quantity: number
     cost_price_usd: number; sale_price_usd: number
+    price_currency?: string
   }[],
   _rate?: number
 ) {
+  const fmtPrice = (val: number, cur?: string) =>
+    cur === 'IQD'
+      ? val.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' د.ع'
+      : '$' + val.toFixed(2)
+
   const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   const lowCount = items.filter(i => i.quantity <= i.min_quantity).length
 
@@ -121,8 +127,8 @@ export async function exportInventoryToPdf(
       <td>${i.unit}</td>
       <td class="num ${isLow ? 'low' : ''}">${i.quantity}</td>
       <td class="num">${i.min_quantity}</td>
-      <td class="num">$${i.cost_price_usd.toFixed(2)}</td>
-      <td class="num">$${i.sale_price_usd.toFixed(2)}</td>
+      <td class="num">${fmtPrice(i.cost_price_usd, i.price_currency)}</td>
+      <td class="num">${fmtPrice(i.sale_price_usd, i.price_currency)}</td>
       <td class="${isLow ? 'low' : 'ok'}">${isLow ? '⚠ منخفض' : '✓ جيد'}</td>
     </tr>`
   }).join('')
