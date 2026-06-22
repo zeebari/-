@@ -18,6 +18,7 @@ export interface Product {
   unit: string
   cost_price_usd: number
   sale_price_usd: number
+  price_currency: Currency
   barcode: string | null
   description: string | null
   created_at: string

@@ -56,7 +56,7 @@ export default function ProductsPage() {
 
   function openEdit(p: Product) {
     setEditTarget(p)
-    setPriceCurrency('USD')
+    setPriceCurrency(p.price_currency as 'USD' | 'IQD' ?? 'USD')
     setForm({
       name: p.name,
       category_id: p.category_id ?? '',
@@ -72,15 +72,13 @@ export default function ProductsPage() {
   async function handleSave() {
     if (!form.name || !form.sale_price_usd) return
     setSaving(true)
-    const toUSD = (v: string) => priceCurrency === 'IQD'
-      ? (parseFloat(v) || 0) / IQD_RATE
-      : parseFloat(v) || 0
     const payload = {
       name: form.name,
       category_id: form.category_id || null,
       unit: form.unit,
-      cost_price_usd: toUSD(form.cost_price_usd),
-      sale_price_usd: toUSD(form.sale_price_usd),
+      cost_price_usd: parseFloat(form.cost_price_usd) || 0,
+      sale_price_usd: parseFloat(form.sale_price_usd) || 0,
+      price_currency: priceCurrency,
       barcode: form.barcode || null,
       description: form.description || null,
     }
@@ -145,7 +143,7 @@ export default function ProductsPage() {
                 <Th>الوحدة</Th>
                 <Th>سعر التكلفة</Th>
                 <Th>سعر البيع</Th>
-                <Th>بالدينار</Th>
+                <Th>المعادل</Th>
                 <Th>إجراءات</Th>
               </tr>
             </Thead>
@@ -154,7 +152,12 @@ export default function ProductsPage() {
                 <Tr><Td className="text-center py-8 text-slate-400" colSpan={7}>جاري التحميل...</Td></Tr>
               ) : filtered.length === 0 ? (
                 <Tr><Td className="text-center py-8 text-slate-400" colSpan={7}>لا توجد منتجات</Td></Tr>
-              ) : filtered.map(p => (
+              ) : filtered.map(p => {
+                const cur = (p.price_currency ?? 'USD') as 'USD' | 'IQD'
+                const equiv = cur === 'USD'
+                  ? formatCurrency(p.sale_price_usd * IQD_RATE, 'IQD')
+                  : formatCurrency(p.sale_price_usd / IQD_RATE, 'USD')
+                return (
                 <Tr key={p.id}>
                   <Td>
                     <div className="font-medium text-slate-900">{p.name}</div>
@@ -166,9 +169,9 @@ export default function ProductsPage() {
                     ) : <span className="text-slate-400">—</span>}
                   </Td>
                   <Td>{p.unit}</Td>
-                  <Td>{formatCurrency(p.cost_price_usd, 'USD')}</Td>
-                  <Td className="font-medium text-green-700">{formatCurrency(p.sale_price_usd, 'USD')}</Td>
-                  <Td className="text-slate-500">{formatCurrency(p.sale_price_usd * IQD_RATE, 'IQD')}</Td>
+                  <Td>{formatCurrency(p.cost_price_usd, cur)}</Td>
+                  <Td className="font-medium text-green-700">{formatCurrency(p.sale_price_usd, cur)}</Td>
+                  <Td className="text-slate-500 text-xs">{equiv}</Td>
                   <Td>
                     <div className="flex gap-2">
                       <button onClick={() => openEdit(p)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
@@ -180,7 +183,8 @@ export default function ProductsPage() {
                     </div>
                   </Td>
                 </Tr>
-              ))}
+                )
+              })}
             </Tbody>
           </Table>
         </div>
@@ -236,8 +240,8 @@ export default function ProductsPage() {
           {form.sale_price_usd && (
             <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded-lg">
               {priceCurrency === 'USD'
-                ? <>سعر البيع بالدينار: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString()} د.ع</strong></>
-                : <>سعر البيع بالدولار: <strong>${(parseFloat(form.sale_price_usd || '0') / IQD_RATE).toFixed(2)}</strong></>
+                ? <>المعادل: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString()} د.ع</strong></>
+                : <>المعادل: <strong>${(parseFloat(form.sale_price_usd || '0') / IQD_RATE).toFixed(2)}</strong></>
               }
             </div>
           )}

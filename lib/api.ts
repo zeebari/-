@@ -170,6 +170,7 @@ export async function createProduct(body: {
   unit: string
   cost_price_usd: number
   sale_price_usd: number
+  price_currency?: string
   barcode?: string | null
   description?: string | null
 }) {
@@ -417,9 +418,9 @@ export async function fetchFinancialSummary() {
   const IQD_RATE = 1310
   const [sales, saleItems, expenses, inventory, customers, suppliers] = await Promise.all([
     supabase.from('sales').select('total_amount, currency, exchange_rate'),
-    supabase.from('sale_items').select('quantity, products(cost_price_usd)'),
+    supabase.from('sale_items').select('quantity, products(cost_price_usd, price_currency)'),
     supabase.from('expenses').select('amount, currency, exchange_rate'),
-    supabase.from('inventory').select('quantity, products(cost_price_usd)'),
+    supabase.from('inventory').select('quantity, products(cost_price_usd, price_currency)'),
     supabase.from('customers').select('balance_owed').gt('balance_owed', 0),
     supabase.from('suppliers').select('balance_owed, currency').gt('balance_owed', 0),
   ])
@@ -431,7 +432,10 @@ export async function fetchFinancialSummary() {
     s + toUSD(r.total_amount, r.currency, r.exchange_rate), 0)
 
   const costOfGoods = (saleItems.data ?? []).reduce((s, si) => {
-    const cost = (si.products as { cost_price_usd?: number } | null)?.cost_price_usd ?? 0
+    const p = si.products as { cost_price_usd?: number; price_currency?: string } | null
+    const cost = p?.price_currency === 'IQD'
+      ? (p?.cost_price_usd ?? 0) / IQD_RATE
+      : (p?.cost_price_usd ?? 0)
     return s + si.quantity * cost
   }, 0)
 
@@ -439,7 +443,10 @@ export async function fetchFinancialSummary() {
     s + toUSD(e.amount, e.currency, e.exchange_rate), 0)
 
   const inventoryValue = (inventory.data ?? []).reduce((s, i) => {
-    const cost = (i.products as { cost_price_usd?: number } | null)?.cost_price_usd ?? 0
+    const p = i.products as { cost_price_usd?: number; price_currency?: string } | null
+    const cost = p?.price_currency === 'IQD'
+      ? (p?.cost_price_usd ?? 0) / IQD_RATE
+      : (p?.cost_price_usd ?? 0)
     return s + i.quantity * cost
   }, 0)
 

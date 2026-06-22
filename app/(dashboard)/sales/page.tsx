@@ -76,7 +76,15 @@ export default function SalesPage() {
     if (field === 'product_id') {
       const prod = products.find(p => p.id === value)
       if (prod) {
-        const price = currency === 'USD' ? prod.sale_price_usd : Math.round(prod.sale_price_usd * IQD_RATE)
+        const prodCur = (prod.price_currency ?? 'USD') as 'USD' | 'IQD'
+        let price: number
+        if (prodCur === currency) {
+          price = prod.sale_price_usd
+        } else if (prodCur === 'USD' && currency === 'IQD') {
+          price = Math.round(prod.sale_price_usd * IQD_RATE)
+        } else {
+          price = parseFloat((prod.sale_price_usd / IQD_RATE).toFixed(2))
+        }
         setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: value, unit_price: String(price) } : it))
       }
     }

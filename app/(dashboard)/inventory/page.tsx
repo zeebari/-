@@ -152,8 +152,12 @@ export default function InventoryPage() {
                       {item.quantity}
                     </Td>
                     <Td className="text-slate-500">{item.min_quantity}</Td>
-                    <Td>{formatCurrency(item.products?.sale_price_usd ?? 0, 'USD')}</Td>
-                    <Td className="text-slate-500">{formatCurrency((item.products?.sale_price_usd ?? 0) * IQD_RATE, 'IQD')}</Td>
+                    <Td>{formatCurrency(item.products?.sale_price_usd ?? 0, (item.products?.price_currency ?? 'USD') as 'USD' | 'IQD')}</Td>
+                    <Td className="text-slate-500 text-xs">
+                      {(item.products?.price_currency ?? 'USD') === 'USD'
+                        ? formatCurrency((item.products?.sale_price_usd ?? 0) * IQD_RATE, 'IQD')
+                        : formatCurrency((item.products?.sale_price_usd ?? 0) / IQD_RATE, 'USD')}
+                    </Td>
                     <Td>
                       <Badge variant={isLow ? 'danger' : 'success'}>
                         {isLow ? 'منخفض' : 'جيد'}
