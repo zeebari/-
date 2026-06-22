@@ -139,9 +139,9 @@ export default function ReportsPage() {
             <div className="grid grid-cols-3 gap-4">
               <div className="card text-center">
                 <BarChart3 size={24} className="text-blue-600 mx-auto mb-2" />
-                <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalSalesUSD, 'USD')}</div>
+                <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalSalesUSD * IQD_RATE, 'IQD')}</div>
                 <div className="text-sm text-slate-500">إجمالي المبيعات</div>
-                <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalSalesUSD * IQD_RATE, 'IQD')}</div>
+                <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalSalesUSD, 'USD')}</div>
               </div>
               <div className="card text-center">
                 <div className="text-2xl font-bold text-green-600">{sales.filter(s => s.status === 'مدفوع').length}</div>
