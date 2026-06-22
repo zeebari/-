@@ -49,8 +49,8 @@ async function buildBackupWorkbook() {
       الاسم: r.name,
       الفئة: r.categories?.name ?? '',
       الوحدة: r.unit,
-      'سعر التكلفة $': r.cost_price_usd,
-      'سعر البيع $': r.sale_price_usd,
+      'سعر التكلفة': r.cost_price_usd,
+      'سعر البيع': r.sale_price_usd,
     })),
     'المنتجات'
   )

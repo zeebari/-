@@ -75,8 +75,8 @@ export default function InventoryPage() {
       الوحدة: i.products?.unit ?? '',
       الكمية: i.quantity,
       'حد التنبيه': i.min_quantity,
-      'سعر التكلفة $': i.products?.cost_price_usd ?? 0,
-      'سعر البيع $': i.products?.sale_price_usd ?? 0,
+      'سعر التكلفة': i.products?.cost_price_usd ?? 0,
+      'سعر البيع': i.products?.sale_price_usd ?? 0,
       الموقع: i.warehouse_location ?? '',
     })))
   }

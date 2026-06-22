@@ -26,8 +26,8 @@ export function exportInventoryToExcel(items: {
   الوحدة: string
   الكمية: number
   'حد التنبيه': number
-  'سعر التكلفة $': number
-  'سعر البيع $': number
+  'سعر التكلفة': number
+  'سعر البيع': number
   الموقع: string
 }[]) {
   exportToExcel(items, 'تقرير-المخزون', 'المخزون')
