@@ -8,6 +8,7 @@ import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
 import { FileSpreadsheet, FileText, BarChart3 } from 'lucide-react'
 import type { Sale, Customer, Supplier, Inventory } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
 import { fetchSalesReport, fetchDebtsReport, fetchInventory } from '@/lib/api'
 
 type Tab = 'sales' | 'debts' | 'inventory'
@@ -188,7 +189,7 @@ export default function ReportsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="card">
               <h3 className="font-semibold text-slate-800 mb-3">ديون الزبائن</h3>
-              <div className="text-2xl font-bold text-red-600 mb-4">{formatCurrency(totalCustomerDebt, 'USD')}</div>
+              <div className="text-2xl font-bold text-red-600 mb-4">{formatCurrency(totalCustomerDebt * IQD_RATE, 'IQD')}</div>
               <div className="space-y-2">
                 {debts.customers.map(c => (
                   <div key={c.id} className="flex justify-between items-center text-sm border-b border-slate-100 pb-2">
@@ -196,7 +197,7 @@ export default function ReportsPage() {
                       <div className="font-medium">{c.name}</div>
                       {c.phone && <div className="text-xs text-slate-400">{c.phone}</div>}
                     </div>
-                    <div className="font-semibold text-red-600">{formatCurrency(c.balance_owed, 'USD')}</div>
+                    <div className="font-semibold text-red-600">{formatCurrency(c.balance_owed * IQD_RATE, 'IQD')}</div>
                   </div>
                 ))}
                 {debts.customers.length === 0 && <p className="text-slate-400 text-sm text-center py-4">لا توجد ديون</p>}

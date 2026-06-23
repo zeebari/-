@@ -102,7 +102,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm text-slate-500 mb-1">ديون الزبائن</p>
                   <p className="text-xl font-bold text-orange-600">
-                    {formatCurrency(stats?.customer_debt_usd ?? 0, 'USD')}
+                    {formatCurrency((stats?.customer_debt_usd ?? 0) * IQD_RATE, 'IQD')}
                   </p>
                 </div>
                 <div className="p-3 rounded-xl bg-orange-50"><Users size={22} className="text-orange-600" /></div>
