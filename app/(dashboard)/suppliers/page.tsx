@@ -16,7 +16,7 @@ import { IQD_RATE } from '@/lib/config'
 import {
   fetchSuppliers, fetchProducts,
   createSupplier, updateSupplier, deleteSupplier,
-  fetchPurchaseOrders, createPurchaseOrder, createSupplierPayment,
+  fetchPurchaseOrders, createPurchaseOrder, createSupplierPayment, createProduct,
 } from '@/lib/api'
 
 type ModalType = 'add-supplier' | 'edit-supplier' | 'purchase-order' | 'payment' | 'history' | null
@@ -33,7 +33,7 @@ export default function SuppliersPage() {
   const [deleting, setDeleting] = useState(false)
 
   const [supForm, setSupForm] = useState({ name: '', phone: '', address: '', currency: 'USD' })
-  const [orderItems, setOrderItems] = useState<{ product_id: string; quantity: string; unit_price: string }[]>([{ product_id: '', quantity: '', unit_price: '' }])
+  const [orderItems, setOrderItems] = useState<{ product_id: string; quantity: string; unit_price: string; new_name?: string; new_unit?: string }[]>([{ product_id: '', quantity: '', unit_price: '' }])
   const [orderNote, setOrderNote] = useState('')
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0])
   const [orderCurrency, setOrderCurrency] = useState<'USD' | 'IQD'>('USD')
@@ -79,7 +79,29 @@ export default function SuppliersPage() {
   async function saveOrder() {
     if (!selected) return
     setSaving(true)
-    const validItems = orderItems.filter(i => i.product_id && i.quantity && i.unit_price)
+    // Create any new products first
+    const resolvedItems = await Promise.all(
+      orderItems
+        .filter(i => i.quantity && i.unit_price && (i.product_id || (i.product_id === '__new__' && i.new_name)))
+        .map(async item => {
+          if (item.product_id === '__new__' && item.new_name) {
+            const price = parseFloat(item.unit_price) || 0
+            const newProd = await createProduct({
+              name: item.new_name,
+              unit: item.new_unit || 'قطعة',
+              cost_price_usd: price,
+              sale_price_usd: price,
+              price_currency: orderCurrency,
+            })
+            return { ...item, product_id: newProd.id }
+          }
+          return item
+        })
+    )
+    const validItems = resolvedItems.filter(i => i.product_id && i.product_id !== '__new__' && i.quantity && i.unit_price)
+    if (validItems.length === 0) { setSaving(false); return }
+    // Reload products list to include newly created ones
+    fetchProducts().then(prods => setProducts(prods as Product[]))
     const total = validItems.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.unit_price), 0)
     const paid = parseFloat(amountPaid) || 0
     await createPurchaseOrder({
@@ -229,10 +251,27 @@ export default function SuppliersPage() {
                   <tr key={idx} className="border-t border-slate-100">
                     <td className="px-3 py-2">
                       <select className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={item.product_id} onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, product_id: e.target.value } : it))}>
+                        value={item.product_id} onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, product_id: e.target.value, new_name: '', new_unit: '' } : it))}>
                         <option value="">اختر منتج</option>
+                        <option value="__new__">➕ منتج جديد غير موجود</option>
                         {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
+                      {item.product_id === '__new__' && (
+                        <div className="mt-1 space-y-1">
+                          <input
+                            className="w-full border border-blue-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="اسم المنتج *"
+                            value={item.new_name ?? ''}
+                            onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, new_name: e.target.value } : it))}
+                          />
+                          <input
+                            className="w-full border border-blue-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="الوحدة (قطعة، كغم...)"
+                            value={item.new_unit ?? ''}
+                            onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, new_unit: e.target.value } : it))}
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" className="w-20 border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -261,8 +300,9 @@ export default function SuppliersPage() {
               <Plus size={14} />إضافة صنف
             </Button>
             <div className="text-lg font-bold text-slate-900">
-              المجموع: {formatCurrency(orderTotal(), orderCurrency)}
-              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</span>}
+              المجموع:{' '}
+              <span dir="ltr" className="inline-block">{formatCurrency(orderTotal(), orderCurrency)}</span>
+              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2"> = {(orderTotal() * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</span>}
             </div>
           </div>
 
