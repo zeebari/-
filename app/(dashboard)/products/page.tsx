@@ -159,7 +159,7 @@ export default function ProductsPage() {
                 const cur = (p.price_currency ?? 'USD') as 'USD' | 'IQD'
                 const equiv = cur === 'USD'
                   ? formatCurrency(p.sale_price_usd * IQD_RATE, 'IQD')
-                  : formatCurrency(p.sale_price_usd / IQD_RATE, 'USD')
+                  : null
                 return (
                 <Tr key={p.id}>
                   <Td>
@@ -240,12 +240,9 @@ export default function ProductsPage() {
               placeholder="0"
             />
           </div>
-          {form.sale_price_usd && (
+          {form.sale_price_usd && priceCurrency === 'USD' && (
             <div className="text-sm text-slate-500 bg-slate-50 p-2 rounded-lg">
-              {priceCurrency === 'USD'
-                ? <>المعادل: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</strong></>
-                : <>المعادل: <strong>${(parseFloat(form.sale_price_usd || '0') / IQD_RATE).toFixed(2)}</strong></>
-              }
+              المعادل: <strong>{(parseFloat(form.sale_price_usd || '0') * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</strong>
             </div>
           )}
           {!editTarget && (

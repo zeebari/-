@@ -468,25 +468,26 @@ export async function updateInventory(body: {
 export async function fetchDashboardStats() {
   const today = new Date().toISOString().split('T')[0]
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0]
-  const IQD = 1310
 
   const [todaySales, monthSales, customerDebt, supplierDebt, allInventory] = await Promise.all([
-    supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null).eq('sale_date', today),
-    supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null).gte('sale_date', monthStart),
+    supabase.from('sales').select('total_amount, currency').is('deleted_at', null).eq('sale_date', today),
+    supabase.from('sales').select('total_amount, currency').is('deleted_at', null).gte('sale_date', monthStart),
     supabase.from('customers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
     supabase.from('suppliers').select('balance_owed, currency').is('deleted_at', null).gt('balance_owed', 0),
     supabase.from('inventory').select('quantity, min_quantity').is('deleted_at', null),
   ])
 
-  const sumUSD = (rows: { total_amount: number; currency: string; exchange_rate: number }[]) =>
-    rows.reduce((s, r) => s + (r.currency === 'USD' ? r.total_amount : r.total_amount / r.exchange_rate), 0)
+  const sumSplit = (rows: { total_amount: number; currency: string }[]) => ({
+    usd: rows.filter(r => r.currency === 'USD').reduce((s, r) => s + r.total_amount, 0),
+    iqd: rows.filter(r => r.currency === 'IQD').reduce((s, r) => s + r.total_amount, 0),
+  })
 
   return {
-    today_sales_usd: sumUSD(todaySales.data ?? []),
-    month_sales_usd: sumUSD(monthSales.data ?? []),
+    today_sales: sumSplit(todaySales.data ?? []),
+    month_sales: sumSplit(monthSales.data ?? []),
     customer_debt_usd: (customerDebt.data ?? []).reduce((s, r) => s + r.balance_owed, 0),
-    supplier_debt_usd: (supplierDebt.data ?? []).reduce((s, r) =>
-      s + (r.currency === 'IQD' ? r.balance_owed / IQD : r.balance_owed), 0),
+    supplier_debt_usd: (supplierDebt.data ?? []).filter(r => r.currency === 'USD').reduce((s, r) => s + r.balance_owed, 0),
+    supplier_debt_iqd: (supplierDebt.data ?? []).filter(r => r.currency === 'IQD').reduce((s, r) => s + r.balance_owed, 0),
     low_stock_count: (allInventory.data ?? []).filter(r => r.quantity <= r.min_quantity).length,
   }
 }
@@ -602,52 +603,62 @@ export async function fetchNotifications(): Promise<{
 }
 
 export async function fetchFinancialSummary() {
-  const IQD_RATE = 1310
   const [sales, saleItems, expenses, inventory, customers, suppliers] = await Promise.all([
-    supabase.from('sales').select('total_amount, currency, exchange_rate').is('deleted_at', null),
+    supabase.from('sales').select('total_amount, currency').is('deleted_at', null),
     supabase.from('sale_items').select('quantity, products(cost_price_usd, price_currency)').is('deleted_at', null),
-    supabase.from('expenses').select('amount, currency, exchange_rate').is('deleted_at', null),
+    supabase.from('expenses').select('amount, currency').is('deleted_at', null),
     supabase.from('inventory').select('quantity, products(cost_price_usd, price_currency)').is('deleted_at', null),
     supabase.from('customers').select('balance_owed').is('deleted_at', null).gt('balance_owed', 0),
     supabase.from('suppliers').select('balance_owed, currency').is('deleted_at', null).gt('balance_owed', 0),
   ])
 
-  const toUSD = (amount: number, currency: string, rate: number) =>
-    currency === 'USD' ? amount : amount / rate
+  const revenue_usd = (sales.data ?? []).filter(r => r.currency === 'USD').reduce((s, r) => s + r.total_amount, 0)
+  const revenue_iqd = (sales.data ?? []).filter(r => r.currency === 'IQD').reduce((s, r) => s + r.total_amount, 0)
 
-  const totalRevenue = (sales.data ?? []).reduce((s, r) =>
-    s + toUSD(r.total_amount, r.currency, r.exchange_rate), 0)
-
-  const costOfGoods = (saleItems.data ?? []).reduce((s, si) => {
+  const cogs_usd = (saleItems.data ?? []).reduce((s, si) => {
     const p = si.products as { cost_price_usd?: number; price_currency?: string } | null
-    const cost = p?.price_currency === 'IQD'
-      ? (p?.cost_price_usd ?? 0) / IQD_RATE
-      : (p?.cost_price_usd ?? 0)
-    return s + si.quantity * cost
+    if ((p?.price_currency ?? 'USD') !== 'USD') return s
+    return s + si.quantity * (p?.cost_price_usd ?? 0)
   }, 0)
 
-  const totalExpenses = (expenses.data ?? []).reduce((s, e) =>
-    s + toUSD(e.amount, e.currency, e.exchange_rate), 0)
+  const cogs_iqd = (saleItems.data ?? []).reduce((s, si) => {
+    const p = si.products as { cost_price_usd?: number; price_currency?: string } | null
+    if ((p?.price_currency ?? 'USD') !== 'IQD') return s
+    return s + si.quantity * (p?.cost_price_usd ?? 0)
+  }, 0)
 
-  const inventoryValue = (inventory.data ?? []).reduce((s, i) => {
+  const expenses_usd = (expenses.data ?? []).filter(e => e.currency === 'USD').reduce((s, e) => s + e.amount, 0)
+  const expenses_iqd = (expenses.data ?? []).filter(e => e.currency === 'IQD').reduce((s, e) => s + e.amount, 0)
+
+  const inventory_value_usd = (inventory.data ?? []).reduce((s, i) => {
     const p = i.products as { cost_price_usd?: number; price_currency?: string } | null
-    const cost = p?.price_currency === 'IQD'
-      ? (p?.cost_price_usd ?? 0) / IQD_RATE
-      : (p?.cost_price_usd ?? 0)
-    return s + i.quantity * cost
+    if ((p?.price_currency ?? 'USD') !== 'USD') return s
+    return s + i.quantity * (p?.cost_price_usd ?? 0)
   }, 0)
 
-  const customerDebt = (customers.data ?? []).reduce((s, r) => s + r.balance_owed, 0)
-  const supplierDebt = (suppliers.data ?? []).reduce((s, r) =>
-    s + toUSD(r.balance_owed, r.currency, IQD_RATE), 0)
+  const inventory_value_iqd = (inventory.data ?? []).reduce((s, i) => {
+    const p = i.products as { cost_price_usd?: number; price_currency?: string } | null
+    if ((p?.price_currency ?? 'USD') !== 'IQD') return s
+    return s + i.quantity * (p?.cost_price_usd ?? 0)
+  }, 0)
+
+  const customer_debt_usd = (customers.data ?? []).reduce((s, r) => s + r.balance_owed, 0)
+  const supplier_debt_usd = (suppliers.data ?? []).filter(r => r.currency === 'USD').reduce((s, r) => s + r.balance_owed, 0)
+  const supplier_debt_iqd = (suppliers.data ?? []).filter(r => r.currency === 'IQD').reduce((s, r) => s + r.balance_owed, 0)
 
   return {
-    total_revenue_usd: totalRevenue,
-    cost_of_goods_usd: costOfGoods,
-    total_expenses_usd: totalExpenses,
-    inventory_value_usd: inventoryValue,
-    customer_debt_usd: customerDebt,
-    supplier_debt_usd: supplierDebt,
-    net_profit_usd: totalRevenue - costOfGoods - totalExpenses,
+    revenue_usd,
+    revenue_iqd,
+    cogs_usd,
+    cogs_iqd,
+    expenses_usd,
+    expenses_iqd,
+    net_profit_usd: revenue_usd - cogs_usd - expenses_usd,
+    net_profit_iqd: revenue_iqd - cogs_iqd - expenses_iqd,
+    inventory_value_usd,
+    inventory_value_iqd,
+    customer_debt_usd,
+    supplier_debt_usd,
+    supplier_debt_iqd,
   }
 }

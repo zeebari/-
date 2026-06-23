@@ -72,16 +72,12 @@ export default function ExpensesPage() {
   const toIQD = (e: Expense) =>
     e.currency === 'IQD' ? e.amount : e.amount * IQD_RATE
 
-  const toUSD = (e: Expense) =>
-    e.currency === 'USD' ? e.amount : e.amount / IQD_RATE
-
   const totalIQD = expenses.reduce((s, e) => s + toIQD(e), 0)
-  const totalUSD = expenses.reduce((s, e) => s + toUSD(e), 0)
+  const totalUSD = expenses.filter(e => e.currency === 'USD').reduce((s, e) => s + e.amount, 0)
 
   const byCategory = CATEGORIES.map(cat => ({
     cat,
     totalIQD: expenses.filter(e => e.category === cat).reduce((s, e) => s + toIQD(e), 0),
-    totalUSD: expenses.filter(e => e.category === cat).reduce((s, e) => s + toUSD(e), 0),
   })).filter(x => x.totalIQD > 0)
 
   return (
@@ -105,7 +101,7 @@ export default function ExpensesPage() {
             <BarChart3 size={24} className="text-red-500 mx-auto mb-2" />
             <div className="text-2xl font-bold text-slate-900">{formatCurrency(totalIQD, 'IQD')}</div>
             <div className="text-sm text-slate-500">إجمالي المصاريف</div>
-            <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalUSD, 'USD')}</div>
+            {totalUSD > 0 && <div className="text-xs text-slate-400 mt-1">{formatCurrency(totalUSD, 'USD')}</div>}
           </div>
           <div className="card col-span-2">
             <div className="text-sm font-medium text-slate-700 mb-3">توزيع حسب الفئة</div>

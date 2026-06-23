@@ -31,10 +31,8 @@ export default function SettingsPage() {
     setTimeout(() => setCapitalSaved(false), 2000)
   }
 
-  const capitalPreview = capital
-    ? capitalCurrency === 'USD'
-      ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع`
-      : `= $${((parseFloat(capital) || 0) / IQD_RATE).toFixed(2)}`
+  const capitalPreview = capital && capitalCurrency === 'USD'
+    ? `= ${((parseFloat(capital) || 0) * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع`
     : null
 
   async function sendBackup() {

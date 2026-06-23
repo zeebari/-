@@ -379,7 +379,6 @@ export default function SalesPage() {
               المجموع: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) : subtotal.toFixed(2)} {currency === 'IQD' ? 'د.ع' : '$'}
             </div>
             {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</div>}
-            {currency === 'IQD' && <div className="text-sm text-blue-500 mt-1">= ${(subtotal / IQD_RATE).toFixed(2)}</div>}
           </div>
 
           {paymentType === 'نقد' && (
