@@ -91,9 +91,10 @@ export default function SalesPage() {
         } else if (prodCur === 'USD' && currency === 'IQD') {
           price = Math.round(prod.sale_price_usd * IQD_RATE)
         } else {
-          price = parseFloat((prod.sale_price_usd / IQD_RATE).toFixed(2))
+          // IQD-priced product in a USD sale — leave blank so user enters price manually
+          price = 0
         }
-        setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: value, unit_price: String(price) } : it))
+        setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: value, unit_price: price > 0 ? String(price) : '' } : it))
       }
     }
   }

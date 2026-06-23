@@ -14,6 +14,7 @@ export interface Category {
 export interface Product {
   id: string
   name: string
+  model: string | null
   category_id: string | null
   unit: string
   cost_price_usd: number

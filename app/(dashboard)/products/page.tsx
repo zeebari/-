@@ -33,7 +33,7 @@ export default function ProductsPage() {
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
   const [editTarget, setEditTarget] = useState<Product | null>(null)
   const [form, setForm] = useState({
-    name: '', category_id: '', unit: 'قطعة',
+    name: '', model: '', category_id: '', unit: 'قطعة',
     cost_price_usd: '', sale_price_usd: '', barcode: '', description: '', initial_quantity: '',
   })
 
@@ -50,7 +50,7 @@ export default function ProductsPage() {
   function openAdd() {
     setEditTarget(null)
     setPriceCurrency('USD')
-    setForm({ name: '', category_id: '', unit: 'قطعة', cost_price_usd: '', sale_price_usd: '', barcode: '', description: '', initial_quantity: '' })
+    setForm({ name: '', model: '', category_id: '', unit: 'قطعة', cost_price_usd: '', sale_price_usd: '', barcode: '', description: '', initial_quantity: '' })
     setModalOpen(true)
   }
 
@@ -59,6 +59,7 @@ export default function ProductsPage() {
     setPriceCurrency(p.price_currency as 'USD' | 'IQD' ?? 'USD')
     setForm({
       name: p.name,
+      model: p.model ?? '',
       category_id: p.category_id ?? '',
       unit: p.unit,
       cost_price_usd: String(p.cost_price_usd),
@@ -75,6 +76,7 @@ export default function ProductsPage() {
     setSaving(true)
     const payload = {
       name: form.name,
+      model: form.model || null,
       category_id: form.category_id || null,
       unit: form.unit,
       cost_price_usd: parseFloat(form.cost_price_usd) || 0,
@@ -164,6 +166,7 @@ export default function ProductsPage() {
                 <Tr key={p.id}>
                   <Td>
                     <div className="font-medium text-slate-900">{p.name}</div>
+                    {p.model && <div className="text-xs text-slate-500 font-mono">{p.model}</div>}
                     {p.barcode && <div className="text-xs text-slate-400">{p.barcode}</div>}
                   </Td>
                   <Td>
@@ -196,7 +199,10 @@ export default function ProductsPage() {
       {/* Add/Edit Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editTarget ? 'تعديل منتج' : 'إضافة منتج جديد'}>
         <div className="space-y-4">
-          <Input label="اسم المنتج *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ادخل اسم المنتج" />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="اسم المنتج *" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="ادخل اسم المنتج" />
+            <Input label="الموديل" value={form.model} onChange={e => setForm(f => ({ ...f, model: e.target.value }))} placeholder="موديل / SKU (اختياري)" />
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <Select
               label="الفئة"

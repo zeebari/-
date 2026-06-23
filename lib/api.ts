@@ -267,6 +267,7 @@ export async function fetchProducts() {
 
 export async function createProduct(body: {
   name: string
+  model?: string | null
   category_id?: string | null
   unit: string
   cost_price_usd: number

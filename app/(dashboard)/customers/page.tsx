@@ -149,7 +149,6 @@ export default function CustomersPage() {
                   <div className={c.balance_owed > 0 ? 'font-semibold text-red-600' : 'text-green-600'}>
                     {formatCurrency(c.balance_owed * IQD_RATE, 'IQD')}
                   </div>
-                  <div className="text-xs text-slate-400">{formatCurrency(c.balance_owed, 'USD')}</div>
                 </Td>
                 <Td>
                   <div className="flex gap-1">
@@ -235,7 +234,6 @@ export default function CustomersPage() {
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-lg p-3 text-sm">
             رصيد الدين: <strong>{formatCurrency((selected?.balance_owed ?? 0) * IQD_RATE, 'IQD')}</strong>
-            <span className="text-xs mr-1">({formatCurrency(selected?.balance_owed ?? 0, 'USD')})</span>
           </div>
           {sales.filter(s => s.status !== 'مدفوع').length > 0 && (
             <div>
