@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     icon: '/icon-192.png',
     apple: '/apple-touch-icon.png',
   },
+  other: {
+    'netlify-toolbar': 'disabled',
+  },
 }
 
 export const viewport: Viewport = {
