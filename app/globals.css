@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Hide Netlify deploy preview toolbar */
+netlify-toolbar, [data-netlify-toolbar], #netlify-toolbar,
+iframe[src*="netlify.com/toolbar"], div[class*="netlifyDraw"] {
+  display: none !important;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
