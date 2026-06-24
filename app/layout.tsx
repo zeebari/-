@@ -10,8 +10,8 @@ const tajawal = Tajawal({
 })
 
 export const metadata: Metadata = {
-  title: 'نظام محاسبة المواد الغذائية والكهربائية',
-  description: 'نظام متكامل لإدارة المخزون والمبيعات',
+  title: 'سيفورا كردستان | Sephora Kurdistan',
+  description: 'منتجات تجميل أصلية من الإمارات — توصيل لجميع محافظات كردستان والعراق',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
