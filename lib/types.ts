@@ -14,10 +14,12 @@ export interface Category {
 export interface Product {
   id: string
   name: string
+  model: string | null
   category_id: string | null
   unit: string
   cost_price_usd: number
   sale_price_usd: number
+  price_currency: Currency
   barcode: string | null
   description: string | null
   created_at: string

@@ -7,30 +7,29 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { FileSpreadsheet, FileText, Pencil, AlertTriangle, Search } from 'lucide-react'
+import { FileSpreadsheet, FileText, Pencil, Trash2, AlertTriangle, Search } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Inventory } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
+import { fetchInventory, updateInventory, deleteInventoryItem } from '@/lib/api'
 
 export default function InventoryPage() {
   const [items, setItems] = useState<Inventory[]>([])
-  const [rate, setRate] = useState(1310)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [editTarget, setEditTarget] = useState<Inventory | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Inventory | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ quantity: '', min_quantity: '', warehouse_location: '', note: '' })
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
     setLoading(true)
-    const [invRes, rateRes] = await Promise.all([
-      fetch('/api/inventory'),
-      fetch('/api/exchange-rate'),
-    ])
-    setItems(await invRes.json())
-    const rateData = await rateRes.json()
-    setRate(rateData.usd_to_iqd ?? 1310)
+    const invData = await fetchInventory()
+    setItems(invData as Inventory[])
     setLoading(false)
   }
 
@@ -47,20 +46,25 @@ export default function InventoryPage() {
   async function handleSave() {
     if (!editTarget) return
     setSaving(true)
-    await fetch('/api/inventory', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        product_id: editTarget.product_id,
-        quantity: parseFloat(form.quantity) || 0,
-        min_quantity: parseFloat(form.min_quantity) || 5,
-        warehouse_location: form.warehouse_location || null,
-        note: form.note || null,
-      }),
+    await updateInventory({
+      product_id: editTarget.product_id,
+      quantity: parseFloat(form.quantity) || 0,
+      min_quantity: parseFloat(form.min_quantity) || 5,
+      warehouse_location: form.warehouse_location || null,
+      note: form.note || null,
     })
     await loadData()
     setEditTarget(null)
     setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteInventoryItem(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
   }
 
   async function exportExcel() {
@@ -71,8 +75,8 @@ export default function InventoryPage() {
       الوحدة: i.products?.unit ?? '',
       الكمية: i.quantity,
       'حد التنبيه': i.min_quantity,
-      'سعر التكلفة $': i.products?.cost_price_usd ?? 0,
-      'سعر البيع $': i.products?.sale_price_usd ?? 0,
+      'سعر التكلفة': i.products?.cost_price_usd ?? 0,
+      'سعر البيع': i.products?.sale_price_usd ?? 0,
       الموقع: i.warehouse_location ?? '',
     })))
   }
@@ -88,8 +92,8 @@ export default function InventoryPage() {
         min_quantity: i.min_quantity,
         cost_price_usd: i.products?.cost_price_usd ?? 0,
         sale_price_usd: i.products?.sale_price_usd ?? 0,
-      })),
-      rate
+        price_currency: i.products?.price_currency ?? 'USD',
+      }))
     )
   }
 
@@ -138,11 +142,11 @@ export default function InventoryPage() {
                 <Th>الوحدة</Th>
                 <Th>الكمية</Th>
                 <Th>حد التنبيه</Th>
-                <Th>سعر البيع $</Th>
+                <Th>سعر البيع</Th>
                 <Th>سعر البيع د.ع</Th>
                 <Th>الحالة</Th>
                 <Th>الموقع</Th>
-                <Th>تعديل</Th>
+                <Th>إجراءات</Th>
               </tr>
             </Thead>
             <Tbody>
@@ -161,8 +165,12 @@ export default function InventoryPage() {
                       {item.quantity}
                     </Td>
                     <Td className="text-slate-500">{item.min_quantity}</Td>
-                    <Td>{formatCurrency(item.products?.sale_price_usd ?? 0, 'USD')}</Td>
-                    <Td className="text-slate-500">{formatCurrency((item.products?.sale_price_usd ?? 0) * rate, 'IQD')}</Td>
+                    <Td>{formatCurrency(item.products?.sale_price_usd ?? 0, (item.products?.price_currency ?? 'USD') as 'USD' | 'IQD')}</Td>
+                    <Td className="text-slate-500 text-xs">
+                      {(item.products?.price_currency ?? 'USD') === 'USD'
+                        ? formatCurrency((item.products?.sale_price_usd ?? 0) * IQD_RATE, 'IQD')
+                        : formatCurrency(item.products?.sale_price_usd ?? 0, 'IQD')}
+                    </Td>
                     <Td>
                       <Badge variant={isLow ? 'danger' : 'success'}>
                         {isLow ? 'منخفض' : 'جيد'}
@@ -170,9 +178,14 @@ export default function InventoryPage() {
                     </Td>
                     <Td className="text-slate-500">{item.warehouse_location ?? '—'}</Td>
                     <Td>
-                      <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600">
-                        <Pencil size={15} />
-                      </button>
+                      <div className="flex gap-1">
+                        <button onClick={() => openEdit(item)} className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600" title="تعديل">
+                          <Pencil size={15} />
+                        </button>
+                        <button onClick={() => setDeleteTarget(item)} className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </Td>
                   </Tr>
                 )
@@ -197,6 +210,14 @@ export default function InventoryPage() {
           </div>
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف من المخزون"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.products?.name}" من المخزون؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }

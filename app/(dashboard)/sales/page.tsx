@@ -8,9 +8,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, FileText, Search } from 'lucide-react'
+import { Plus, FileText, Search, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Sale, Customer, Product, Installment } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
+import { fetchSales, fetchCustomers, fetchProducts, createSale, deleteSale, createCustomer } from '@/lib/api'
 
 type Currency = 'USD' | 'IQD'
 type PaymentType = 'نقد' | 'دين' | 'أقساط'
@@ -25,21 +28,27 @@ export default function SalesPage() {
   const [sales, setSales] = useState<Sale[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [products, setProducts] = useState<Product[]>([])
-  const [rate, setRate] = useState(1310)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [detailSale, setDetailSale] = useState<Sale | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Sale | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   // Form state
-  const [currency, setCurrency] = useState<Currency>('USD')
+  const [currency, setCurrency] = useState<Currency>('IQD')
   const [paymentType, setPaymentType] = useState<PaymentType>('نقد')
   const [customerId, setCustomerId] = useState('')
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0])
   const [note, setNote] = useState('')
   const [amountPaid, setAmountPaid] = useState('')
   const [items, setItems] = useState<SaleFormItem[]>([{ product_id: '', quantity: '', unit_price: '' }])
+
+  // New customer info (for cash sales)
+  const [newCustName, setNewCustName] = useState('')
+  const [newCustPhone, setNewCustPhone] = useState('')
 
   // Installments
   const [installmentCount, setInstallmentCount] = useState('3')
@@ -53,35 +62,39 @@ export default function SalesPage() {
 
   async function loadData() {
     setLoading(true)
-    const [saleRes, custRes, prodRes, rateRes] = await Promise.all([
-      fetch('/api/sales'),
-      fetch('/api/customers'),
-      fetch('/api/products'),
-      fetch('/api/exchange-rate'),
+    const [salesData, custsData, prodsData] = await Promise.all([
+      fetchSales(), fetchCustomers(), fetchProducts(),
     ])
-    setSales(await saleRes.json())
-    setCustomers(await custRes.json())
-    setProducts(await prodRes.json())
-    const rateData = await rateRes.json()
-    setRate(rateData.usd_to_iqd ?? 1310)
+    setSales(salesData as Sale[])
+    setCustomers(custsData as Customer[])
+    setProducts(prodsData as Product[])
     setLoading(false)
   }
 
   function openNew() {
-    setCurrency('USD'); setPaymentType('نقد'); setCustomerId(''); setSaleDate(new Date().toISOString().split('T')[0])
+    setCurrency('IQD'); setPaymentType('نقد'); setCustomerId(''); setSaleDate(new Date().toISOString().split('T')[0])
     setNote(''); setAmountPaid(''); setDownPayment(''); setInstallmentCount('3')
+    setNewCustName(''); setNewCustPhone('')
     setItems([{ product_id: '', quantity: '', unit_price: '' }])
     setModalOpen(true)
   }
 
   function updateItem(idx: number, field: keyof SaleFormItem, value: string) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
-    // Auto-fill price from product
     if (field === 'product_id') {
       const prod = products.find(p => p.id === value)
       if (prod) {
-        const price = currency === 'USD' ? prod.sale_price_usd : Math.round(prod.sale_price_usd * rate)
-        setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: value, unit_price: String(price) } : it))
+        const prodCur = (prod.price_currency ?? 'USD') as 'USD' | 'IQD'
+        let price: number
+        if (prodCur === currency) {
+          price = prod.sale_price_usd
+        } else if (prodCur === 'USD' && currency === 'IQD') {
+          price = Math.round(prod.sale_price_usd * IQD_RATE)
+        } else {
+          // IQD-priced product in a USD sale — leave blank so user enters price manually
+          price = 0
+        }
+        setItems(prev => prev.map((it, i) => i === idx ? { ...it, product_id: value, unit_price: price > 0 ? String(price) : '' } : it))
       }
     }
   }
@@ -106,6 +119,7 @@ export default function SalesPage() {
     const validItems = items.filter(i => i.product_id && i.quantity && i.unit_price)
     if (validItems.length === 0) return
     setSaving(true)
+    setSaveError('')
 
     let paidAmount = parseFloat(amountPaid || '0')
     let installmentsData: { due_date: string; amount: number }[] = []
@@ -117,23 +131,40 @@ export default function SalesPage() {
       installmentsData = generateInstallments()
     }
 
-    const payload = {
-      customer_id: customerId || null,
-      sale_date: saleDate,
-      total_amount: subtotal,
-      currency,
-      exchange_rate: rate,
-      payment_type: paymentType,
-      amount_paid: paidAmount,
-      note: note || null,
-      items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
-      installments: installmentsData,
+    try {
+      let resolvedCustomerId = customerId || null
+      if (!customerId && newCustName.trim()) {
+        const newCust = await createCustomer({ name: newCustName.trim(), phone: newCustPhone.trim() || undefined })
+        resolvedCustomerId = newCust.id
+        setCustomers(prev => [newCust as Customer, ...prev])
+      }
+      await createSale({
+        customer_id: resolvedCustomerId,
+        sale_date: saleDate,
+        total_amount: subtotal,
+        currency,
+        exchange_rate: IQD_RATE,
+        payment_type: paymentType,
+        amount_paid: paidAmount,
+        note: note || null,
+        items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
+        installments: installmentsData,
+      })
+      await loadData()
+      setModalOpen(false)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'حدث خطأ')
     }
-
-    await fetch('/api/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    await loadData()
-    setModalOpen(false)
     setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteSale(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
   }
 
   async function printSale(sale: Sale) {
@@ -194,7 +225,7 @@ export default function SalesPage() {
                 <Th>المدفوع</Th>
                 <Th>المتبقي</Th>
                 <Th>الحالة</Th>
-                <Th>طباعة</Th>
+                <Th>إجراءات</Th>
               </tr>
             </Thead>
             <Tbody>
@@ -215,9 +246,14 @@ export default function SalesPage() {
                   </Td>
                   <Td>{statusBadge(s.status)}</Td>
                   <Td>
-                    <button onClick={e => { e.stopPropagation(); printSale(s) }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600">
-                      <FileText size={14} />
-                    </button>
+                    <div className="flex gap-1">
+                      <button onClick={e => { e.stopPropagation(); printSale(s) }} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600" title="طباعة">
+                        <FileText size={14} />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); setDeleteTarget(s) }} className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </Td>
                 </Tr>
               ))}
@@ -229,13 +265,12 @@ export default function SalesPage() {
       {/* New Sale Modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="فاتورة بيع جديدة" size="xl">
         <div className="space-y-5">
-          {/* Header */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-sm font-medium text-slate-700">الزبون</label>
               <select className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={customerId} onChange={e => setCustomerId(e.target.value)}>
-                <option value="">بيع نقدي</option>
+                value={customerId} onChange={e => { setCustomerId(e.target.value); setNewCustName(''); setNewCustPhone('') }}>
+                <option value="">بيع نقدي (زبون جديد اختياري)</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -246,16 +281,62 @@ export default function SalesPage() {
               options={[{ value: 'نقد', label: 'نقد' }, { value: 'دين', label: 'دين (آجل)' }, { value: 'أقساط', label: 'أقساط' }]} />
           </div>
 
-          {/* Items Table */}
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
+          {!customerId && (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3">
+              <p className="text-xs text-slate-500 mb-2 font-medium">معلومات الزبون (اختياري — لحفظه في قائمة الزبائن)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input label="اسم الزبون" value={newCustName} onChange={e => setNewCustName(e.target.value)} placeholder="اسم الزبون" />
+                <Input label="رقم الهاتف" type="tel" value={newCustPhone} onChange={e => setNewCustPhone(e.target.value)} placeholder="07xx xxx xxxx" dir="ltr" />
+              </div>
+            </div>
+          )}
+
+          {/* Mobile: card layout */}
+          <div className="md:hidden space-y-3">
+            {items.map((item, idx) => {
+              const lineTotal = parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')
+              return (
+                <div key={idx} className="border border-slate-200 rounded-xl p-3 space-y-2 bg-slate-50/50">
+                  <select className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={item.product_id} onChange={e => updateItem(idx, 'product_id', e.target.value)}>
+                    <option value="">اختر منتج...</option>
+                    {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>)}
+                  </select>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">الكمية</label>
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">سعر الوحدة</label>
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded-lg px-2 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-slate-500 mb-1 block">المجموع</label>
+                      <div className="py-2 text-sm font-semibold text-blue-700">{lineTotal.toFixed(currency === 'IQD' ? 0 : 2)}</div>
+                    </div>
+                  </div>
+                  {items.length > 1 && (
+                    <button onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium">× حذف الصنف</button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop: table layout */}
+          <div className="hidden md:block border border-slate-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium text-slate-600">المنتج</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">الكمية</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">سعر الوحدة</th>
-                  <th className="px-3 py-2 text-right font-medium text-slate-600">المجموع</th>
-                  <th className="px-3 py-2"></th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-600 w-24">الكمية</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-600 w-32">سعر الوحدة</th>
+                  <th className="px-3 py-2 text-right font-medium text-slate-600 w-28">المجموع</th>
+                  <th className="px-3 py-2 w-8"></th>
                 </tr>
               </thead>
               <tbody>
@@ -269,15 +350,15 @@ export default function SalesPage() {
                       </select>
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" step="0.01" className="w-20 border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)} placeholder="0" />
                     </td>
                     <td className="px-3 py-2">
-                      <input type="number" step="0.01" className="w-28 border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} placeholder="0.00" />
+                      <input type="number" step="0.01" className="w-full border border-slate-300 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        value={item.unit_price} onChange={e => updateItem(idx, 'unit_price', e.target.value)} placeholder="0" />
                     </td>
                     <td className="px-3 py-2 font-semibold text-slate-800">
-                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(2)}
+                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(currency === 'IQD' ? 0 : 2)}
                     </td>
                     <td className="px-3 py-2">
                       {items.length > 1 && (
@@ -294,26 +375,22 @@ export default function SalesPage() {
             <Plus size={14} />إضافة صنف
           </Button>
 
-          {/* Total */}
           <div className="bg-blue-50 rounded-lg p-4 text-right">
             <div className="text-2xl font-bold text-blue-700">
-              المجموع: {subtotal.toFixed(2)} {currency}
+              المجموع: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) : subtotal.toFixed(2)} {currency === 'IQD' ? 'د.ع' : '$'}
             </div>
-            {currency === 'USD' && (
-              <div className="text-sm text-blue-500 mt-1">= {(subtotal * rate).toLocaleString()} د.ع</div>
-            )}
+            {currency === 'USD' && <div className="text-sm text-blue-500 mt-1">= {(subtotal * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</div>}
           </div>
 
-          {/* Payment type specific fields */}
           {paymentType === 'نقد' && (
             <div className="bg-green-50 text-green-700 rounded-lg p-3 text-sm">
-              سيتم تسجيل الدفع الكامل: {subtotal.toFixed(2)} {currency}
+              سيتم تسجيل الدفع الكامل: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' د.ع' : '$' + subtotal.toFixed(2)}
             </div>
           )}
 
           {paymentType === 'دين' && (
             <div className="bg-red-50 text-red-700 rounded-lg p-3 text-sm">
-              سيُضاف المبلغ كاملاً لرصيد دين الزبون: {subtotal.toFixed(2)} {currency}
+              سيُضاف المبلغ كاملاً لرصيد دين الزبون: {currency === 'IQD' ? subtotal.toLocaleString('en-US', { maximumFractionDigits: 0 }) + ' د.ع' : '$' + subtotal.toFixed(2)}
             </div>
           )}
 
@@ -327,12 +404,12 @@ export default function SalesPage() {
               </div>
               {subtotal > 0 && (
                 <div className="text-sm text-slate-600 space-y-1">
-                  <div>المبلغ المتبقي بعد الدفعة الأولى: <strong>{(subtotal - parseFloat(downPayment || '0')).toFixed(2)} {currency}</strong></div>
-                  <div>قيمة كل قسط: <strong>{((subtotal - parseFloat(downPayment || '0')) / (parseInt(installmentCount) || 1)).toFixed(2)} {currency}</strong></div>
+                  <div>المبلغ المتبقي بعد الدفعة الأولى: <strong>{formatCurrency(subtotal - parseFloat(downPayment || '0'), currency)}</strong></div>
+                  <div>قيمة كل قسط: <strong>{formatCurrency((subtotal - parseFloat(downPayment || '0')) / (parseInt(installmentCount) || 1), currency)}</strong></div>
                   <div className="mt-2 font-medium text-slate-700">مواعيد الأقساط:</div>
                   {generateInstallments().map((inst, i) => (
                     <div key={i} className="text-xs text-slate-500">
-                      قسط {i + 1}: {inst.due_date} — {inst.amount.toFixed(2)} {currency}
+                      قسط {i + 1}: {inst.due_date} — {formatCurrency(inst.amount, currency)}
                     </div>
                   ))}
                 </div>
@@ -342,6 +419,9 @@ export default function SalesPage() {
 
           <Textarea label="ملاحظة" value={note} onChange={e => setNote(e.target.value)} placeholder="ملاحظات اختيارية" />
 
+          {saveError && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">{saveError}</div>
+          )}
           <div className="flex gap-3 justify-end pt-2">
             <Button variant="outline" onClick={() => setModalOpen(false)}>إلغاء</Button>
             <Button onClick={handleSave} loading={saving}>حفظ الفاتورة</Button>
@@ -359,7 +439,6 @@ export default function SalesPage() {
               <div><span className="text-slate-500">نوع الدفع:</span> <Badge variant="info">{detailSale.payment_type}</Badge></div>
               <div><span className="text-slate-500">الحالة:</span> {statusBadge(detailSale.status)}</div>
               <div><span className="text-slate-500">العملة:</span> <strong>{detailSale.currency}</strong></div>
-              <div><span className="text-slate-500">سعر الصرف:</span> <strong>1$ = {detailSale.exchange_rate} د.ع</strong></div>
             </div>
 
             <Table>
@@ -376,21 +455,21 @@ export default function SalesPage() {
                   <Tr key={si.id}>
                     <Td>{si.products?.name}</Td>
                     <Td>{si.quantity}</Td>
-                    <Td>{si.unit_price.toFixed(2)}</Td>
-                    <Td className="font-semibold">{si.total.toFixed(2)}</Td>
+                    <Td>{formatCurrency(si.unit_price, detailSale.currency as Currency)}</Td>
+                    <Td className="font-semibold">{formatCurrency(si.total, detailSale.currency as Currency)}</Td>
                   </Tr>
                 ))}
               </Tbody>
             </Table>
 
             <div className="bg-slate-50 rounded-lg p-4 text-sm space-y-2">
-              <div className="flex justify-between"><span>المجموع:</span><strong>{detailSale.total_amount.toFixed(2)} {detailSale.currency}</strong></div>
-              <div className="flex justify-between text-green-600"><span>المدفوع:</span><strong>{detailSale.amount_paid.toFixed(2)} {detailSale.currency}</strong></div>
-              <div className="flex justify-between text-red-600"><span>المتبقي:</span><strong>{(detailSale.total_amount - detailSale.amount_paid).toFixed(2)} {detailSale.currency}</strong></div>
+              <div className="flex justify-between"><span>المجموع:</span><strong>{formatCurrency(detailSale.total_amount, detailSale.currency as Currency)}</strong></div>
+              <div className="flex justify-between text-green-600"><span>المدفوع:</span><strong>{formatCurrency(detailSale.amount_paid, detailSale.currency as Currency)}</strong></div>
+              <div className="flex justify-between text-red-600"><span>المتبقي:</span><strong>{formatCurrency(detailSale.total_amount - detailSale.amount_paid, detailSale.currency as Currency)}</strong></div>
               {detailSale.currency === 'USD' && (
                 <div className="flex justify-between text-slate-500 text-xs pt-1 border-t border-slate-200">
                   <span>المجموع بالدينار:</span>
-                  <strong>{(detailSale.total_amount * detailSale.exchange_rate).toLocaleString()} د.ع</strong>
+                  <strong>{(detailSale.total_amount * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</strong>
                 </div>
               )}
             </div>
@@ -401,6 +480,15 @@ export default function SalesPage() {
           </div>
         </Modal>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف فاتورة"
+        message={`هل أنت متأكد من حذف فاتورة #${deleteTarget?.id.slice(0, 8).toUpperCase()}؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }

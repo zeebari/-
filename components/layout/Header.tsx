@@ -1,5 +1,6 @@
 'use client'
 import { Menu } from 'lucide-react'
+import { NotificationBell } from './NotificationBell'
 
 interface HeaderProps {
   title: string
@@ -20,6 +21,7 @@ export function Header({ title, onMenuClick, children }: HeaderProps) {
         <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
       </div>
       <div className="flex items-center gap-2">
+        <NotificationBell />
         {children}
       </div>
     </header>

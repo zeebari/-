@@ -10,7 +10,7 @@ export function formatCurrency(amount: number, currency: 'USD' | 'IQD'): string 
   if (currency === 'USD') {
     return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
-  return `${amount.toLocaleString('ar-IQ')} د.ع`
+  return `${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع`
 }
 
 export function convertAmount(amount: number, from: 'USD' | 'IQD', to: 'USD' | 'IQD', rate: number): number {

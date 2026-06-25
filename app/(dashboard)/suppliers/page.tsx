@@ -8,9 +8,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { Modal } from '@/components/ui/modal'
 import { Badge } from '@/components/ui/badge'
 import { Table, Thead, Tbody, Th, Td, Tr } from '@/components/ui/table'
-import { Plus, Pencil, Trash2, ShoppingBag, CreditCard } from 'lucide-react'
+import { Plus, Pencil, ShoppingBag, CreditCard, Trash2 } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import type { Supplier, PurchaseOrder, Product } from '@/lib/types'
 import { formatCurrency } from '@/lib/currency'
+import { IQD_RATE } from '@/lib/config'
+import {
+  fetchSuppliers, fetchProducts,
+  createSupplier, updateSupplier, deleteSupplier,
+  fetchPurchaseOrders, createPurchaseOrder, createSupplierPayment, createProduct,
+} from '@/lib/api'
 
 type ModalType = 'add-supplier' | 'edit-supplier' | 'purchase-order' | 'payment' | 'history' | null
 
@@ -18,14 +25,15 @@ export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [orders, setOrders] = useState<PurchaseOrder[]>([])
-  const [rate, setRate] = useState(1310)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [modal, setModal] = useState<ModalType>(null)
   const [selected, setSelected] = useState<Supplier | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [supForm, setSupForm] = useState({ name: '', phone: '', address: '', currency: 'USD' })
-  const [orderItems, setOrderItems] = useState<{ product_id: string; quantity: string; unit_price: string }[]>([{ product_id: '', quantity: '', unit_price: '' }])
+  const [orderItems, setOrderItems] = useState<{ product_id: string; quantity: string; unit_price: string; new_name?: string; new_unit?: string }[]>([{ product_id: '', quantity: '', unit_price: '' }])
   const [orderNote, setOrderNote] = useState('')
   const [orderDate, setOrderDate] = useState(new Date().toISOString().split('T')[0])
   const [orderCurrency, setOrderCurrency] = useState<'USD' | 'IQD'>('USD')
@@ -37,51 +45,75 @@ export default function SuppliersPage() {
 
   async function loadData() {
     setLoading(true)
-    const [supRes, prodRes, rateRes] = await Promise.all([
-      fetch('/api/suppliers'),
-      fetch('/api/products'),
-      fetch('/api/exchange-rate'),
-    ])
-    setSuppliers(await supRes.json())
-    setProducts(await prodRes.json())
-    const rateData = await rateRes.json()
-    setRate(rateData.usd_to_iqd ?? 1310)
+    const [sups, prods] = await Promise.all([fetchSuppliers(), fetchProducts()])
+    setSuppliers(sups as Supplier[])
+    setProducts(prods as Product[])
     setLoading(false)
   }
 
   async function loadOrders(supplierId: string) {
-    const res = await fetch(`/api/suppliers/purchase-orders?supplier_id=${supplierId}`)
-    setOrders(await res.json())
+    const data = await fetchPurchaseOrders(supplierId)
+    setOrders(data as PurchaseOrder[])
   }
 
-  async function saveSuppiler() {
+  async function saveSupplier() {
     if (!supForm.name) return
     setSaving(true)
-    const url = selected ? `/api/suppliers/${selected.id}` : '/api/suppliers'
-    const method = selected ? 'PUT' : 'POST'
-    await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(supForm) })
+    if (selected) {
+      await updateSupplier(selected.id, supForm)
+    } else {
+      await createSupplier(supForm)
+    }
     await loadData(); setModal(null); setSaving(false)
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    await deleteSupplier(deleteTarget.id)
+    await loadData()
+    setDeleteTarget(null)
+    setDeleting(false)
   }
 
   async function saveOrder() {
     if (!selected) return
     setSaving(true)
-    const validItems = orderItems.filter(i => i.product_id && i.quantity && i.unit_price)
+    // Create any new products first
+    const resolvedItems = await Promise.all(
+      orderItems
+        .filter(i => i.quantity && i.unit_price && (i.product_id || (i.product_id === '__new__' && i.new_name)))
+        .map(async item => {
+          if (item.product_id === '__new__' && item.new_name) {
+            const price = parseFloat(item.unit_price) || 0
+            const newProd = await createProduct({
+              name: item.new_name,
+              unit: item.new_unit || 'قطعة',
+              cost_price_usd: price,
+              sale_price_usd: price,
+              price_currency: orderCurrency,
+            })
+            return { ...item, product_id: newProd.id }
+          }
+          return item
+        })
+    )
+    const validItems = resolvedItems.filter(i => i.product_id && i.product_id !== '__new__' && i.quantity && i.unit_price)
+    if (validItems.length === 0) { setSaving(false); return }
+    // Reload products list to include newly created ones
+    fetchProducts().then(prods => setProducts(prods as Product[]))
     const total = validItems.reduce((s, i) => s + parseFloat(i.quantity) * parseFloat(i.unit_price), 0)
-    await fetch('/api/suppliers/purchase-orders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        supplier_id: selected.id,
-        order_date: orderDate,
-        total_amount: total,
-        currency: orderCurrency,
-        exchange_rate: rate,
-        amount_paid: parseFloat(amountPaid) || 0,
-        status: parseFloat(amountPaid) >= total ? 'مدفوع' : parseFloat(amountPaid) > 0 ? 'جزئي' : 'معلق',
-        note: orderNote || null,
-        items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
-      }),
+    const paid = parseFloat(amountPaid) || 0
+    await createPurchaseOrder({
+      supplier_id: selected.id,
+      order_date: orderDate,
+      total_amount: total,
+      currency: orderCurrency,
+      exchange_rate: IQD_RATE,
+      amount_paid: paid,
+      status: paid >= total ? 'مدفوع' : paid > 0 ? 'جزئي' : 'معلق',
+      note: orderNote || null,
+      items: validItems.map(i => ({ product_id: i.product_id, quantity: parseFloat(i.quantity), unit_price: parseFloat(i.unit_price) })),
     })
     await loadData(); setModal(null); setSaving(false)
     setOrderItems([{ product_id: '', quantity: '', unit_price: '' }])
@@ -90,18 +122,14 @@ export default function SuppliersPage() {
   async function savePayment() {
     if (!selected || !payForm.amount) return
     setSaving(true)
-    await fetch('/api/suppliers/payments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        supplier_id: selected.id,
-        purchase_order_id: payForm.purchase_order_id || null,
-        amount: parseFloat(payForm.amount),
-        currency: payForm.currency,
-        exchange_rate: rate,
-        payment_date: payForm.payment_date,
-        note: payForm.note || null,
-      }),
+    await createSupplierPayment({
+      supplier_id: selected.id,
+      purchase_order_id: payForm.purchase_order_id || null,
+      amount: parseFloat(payForm.amount),
+      currency: payForm.currency,
+      exchange_rate: IQD_RATE,
+      payment_date: payForm.payment_date,
+      note: payForm.note || null,
     })
     await loadData(); setModal(null); setSaving(false)
   }
@@ -162,13 +190,17 @@ export default function SuppliersPage() {
                       className="p-1.5 rounded-lg hover:bg-green-50 text-green-600" title="إضافة فاتورة شراء">
                       <ShoppingBag size={14} />
                     </button>
-                    <button onClick={() => { setSelected(s); setPayForm({ amount: '', currency: s.currency, note: '', purchase_order_id: '', payment_date: new Date().toISOString().split('T')[0] }); setModal('payment') }}
+                    <button onClick={() => { setSelected(s); setPayForm({ amount: '', currency: s.currency, note: '', purchase_order_id: '', payment_date: new Date().toISOString().split('T')[0] }); setOrders([]); loadOrders(s.id); setModal('payment') }}
                       className="p-1.5 rounded-lg hover:bg-purple-50 text-purple-600" title="تسجيل دفعة">
                       <CreditCard size={14} />
                     </button>
                     <button onClick={() => { setSelected(s); loadOrders(s.id); setModal('history') }}
                       className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 text-xs px-2" title="السجل">
                       سجل
+                    </button>
+                    <button onClick={() => setDeleteTarget(s)}
+                      className="p-1.5 rounded-lg hover:bg-red-50 text-red-600" title="حذف">
+                      <Trash2 size={14} />
                     </button>
                   </div>
                 </Td>
@@ -188,7 +220,7 @@ export default function SuppliersPage() {
             options={[{ value: 'USD', label: 'دولار أمريكي' }, { value: 'IQD', label: 'دينار عراقي' }]} />
           <div className="flex gap-3 justify-end pt-2">
             <Button variant="outline" onClick={() => setModal(null)}>إلغاء</Button>
-            <Button onClick={saveSuppiler} loading={saving}>{modal === 'edit-supplier' ? 'حفظ' : 'إضافة'}</Button>
+            <Button onClick={saveSupplier} loading={saving}>{modal === 'edit-supplier' ? 'حفظ' : 'إضافة'}</Button>
           </div>
         </div>
       </Modal>
@@ -203,8 +235,8 @@ export default function SuppliersPage() {
             <Input label="المبلغ المدفوع" type="number" step="0.01" value={amountPaid} onChange={e => setAmountPaid(e.target.value)} placeholder="0" />
           </div>
 
-          <div className="border border-slate-200 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="border border-slate-200 rounded-lg overflow-x-auto">
+            <table className="w-full text-sm min-w-[400px]">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-3 py-2 text-right font-medium text-slate-600">المنتج</th>
@@ -219,10 +251,27 @@ export default function SuppliersPage() {
                   <tr key={idx} className="border-t border-slate-100">
                     <td className="px-3 py-2">
                       <select className="w-full border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        value={item.product_id} onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, product_id: e.target.value } : it))}>
+                        value={item.product_id} onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, product_id: e.target.value, new_name: '', new_unit: '' } : it))}>
                         <option value="">اختر منتج</option>
+                        <option value="__new__">➕ منتج جديد غير موجود</option>
                         {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
+                      {item.product_id === '__new__' && (
+                        <div className="mt-1 space-y-1">
+                          <input
+                            className="w-full border border-blue-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="اسم المنتج *"
+                            value={item.new_name ?? ''}
+                            onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, new_name: e.target.value } : it))}
+                          />
+                          <input
+                            className="w-full border border-blue-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            placeholder="الوحدة (قطعة، كغم...)"
+                            value={item.new_unit ?? ''}
+                            onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, new_unit: e.target.value } : it))}
+                          />
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <input type="number" className="w-20 border border-slate-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -233,7 +282,7 @@ export default function SuppliersPage() {
                         value={item.unit_price} onChange={e => setOrderItems(items => items.map((it, i) => i === idx ? { ...it, unit_price: e.target.value } : it))} placeholder="0.00" />
                     </td>
                     <td className="px-3 py-2 font-medium">
-                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(2)}
+                      {(parseFloat(item.quantity || '0') * parseFloat(item.unit_price || '0')).toFixed(orderCurrency === 'IQD' ? 0 : 2)}
                     </td>
                     <td className="px-3 py-2">
                       {orderItems.length > 1 && (
@@ -251,15 +300,16 @@ export default function SuppliersPage() {
               <Plus size={14} />إضافة صنف
             </Button>
             <div className="text-lg font-bold text-slate-900">
-              المجموع: {orderTotal().toFixed(2)} {orderCurrency}
-              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2">= {(orderTotal() * rate).toLocaleString()} د.ع</span>}
+              المجموع:{' '}
+              <span dir="ltr" className="inline-block">{formatCurrency(orderTotal(), orderCurrency)}</span>
+              {orderCurrency === 'USD' && <span className="text-sm text-slate-500 mr-2"> = {(orderTotal() * IQD_RATE).toLocaleString('en-US', { maximumFractionDigits: 0 })} د.ع</span>}
             </div>
           </div>
 
           {parseFloat(amountPaid) > 0 && (
             <div className="text-sm bg-slate-50 p-3 rounded-lg">
               <span className="text-slate-600">المتبقي: </span>
-              <strong className="text-red-600">{(orderTotal() - parseFloat(amountPaid)).toFixed(2)} {orderCurrency}</strong>
+              <strong className="text-red-600">{formatCurrency(orderTotal() - parseFloat(amountPaid), orderCurrency)}</strong>
             </div>
           )}
 
@@ -281,6 +331,23 @@ export default function SuppliersPage() {
           <Input label="المبلغ المدفوع *" type="number" step="0.01" value={payForm.amount} onChange={e => setPayForm(f => ({ ...f, amount: e.target.value }))} placeholder="0.00" />
           <Select label="العملة" value={payForm.currency} onChange={e => setPayForm(f => ({ ...f, currency: e.target.value }))}
             options={[{ value: 'USD', label: 'دولار' }, { value: 'IQD', label: 'دينار' }]} />
+          {orders.filter(o => o.status !== 'مدفوع').length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">تطبيق على فاتورة (اختياري)</label>
+              <select
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                value={payForm.purchase_order_id}
+                onChange={e => setPayForm(f => ({ ...f, purchase_order_id: e.target.value }))}
+              >
+                <option value="">— دفعة عامة على الحساب —</option>
+                {orders.filter(o => o.status !== 'مدفوع').map(o => (
+                  <option key={o.id} value={o.id}>
+                    {o.order_date} — {formatCurrency(o.total_amount - o.amount_paid, o.currency as 'USD' | 'IQD')} متبقي
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <Input label="التاريخ" type="date" value={payForm.payment_date} onChange={e => setPayForm(f => ({ ...f, payment_date: e.target.value }))} />
           <Textarea label="ملاحظة" value={payForm.note} onChange={e => setPayForm(f => ({ ...f, note: e.target.value }))} placeholder="ملاحظة اختيارية" />
           <div className="flex gap-3 justify-end">
@@ -305,15 +372,23 @@ export default function SuppliersPage() {
                 {statusBadge(o.status)}
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm text-slate-600">
-                <div>المجموع: <strong>{o.total_amount.toFixed(2)} {o.currency}</strong></div>
-                <div>المدفوع: <strong className="text-green-600">{o.amount_paid.toFixed(2)} {o.currency}</strong></div>
-                <div>المتبقي: <strong className="text-red-600">{(o.total_amount - o.amount_paid).toFixed(2)} {o.currency}</strong></div>
+                <div>المجموع: <strong>{formatCurrency(o.total_amount, o.currency as 'USD' | 'IQD')}</strong></div>
+                <div>المدفوع: <strong className="text-green-600">{formatCurrency(o.amount_paid, o.currency as 'USD' | 'IQD')}</strong></div>
+                <div>المتبقي: <strong className="text-red-600">{formatCurrency(o.total_amount - o.amount_paid, o.currency as 'USD' | 'IQD')}</strong></div>
               </div>
               {o.note && <p className="text-xs text-slate-400 mt-2">{o.note}</p>}
             </div>
           ))}
         </div>
       </Modal>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title="حذف مورد"
+        message={`هل أنت متأكد من حذف "${deleteTarget?.name}"؟`}
+        loading={deleting}
+      />
     </DashboardLayout>
   )
 }
