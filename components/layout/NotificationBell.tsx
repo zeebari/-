@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Bell, Package, CreditCard, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/currency'
 import { IQD_RATE } from '@/lib/config'
@@ -27,8 +28,14 @@ interface NotificationData {
 }
 
 export function NotificationBell() {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [data, setData] = useState<NotificationData>({ low_stock: [], upcoming_installments: [] })
+
+  function navigate(path: string) {
+    setOpen(false)
+    router.push(path)
+  }
 
   useEffect(() => {
     import('@/lib/api').then(m => m.fetchNotifications()).then(setData).catch(() => {})
@@ -66,7 +73,11 @@ export function NotificationBell() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {data.low_stock.map((item, i) => (
-                  <div key={i} className="flex items-start gap-3 px-4 py-3">
+                  <button
+                    key={i}
+                    onClick={() => navigate('/inventory')}
+                    className="w-full flex items-start gap-3 px-4 py-3 hover:bg-orange-50 transition-colors text-right"
+                  >
                     <div className="p-1.5 bg-orange-50 rounded-lg shrink-0 mt-0.5">
                       <Package size={14} className="text-orange-500" />
                     </div>
@@ -76,14 +87,18 @@ export function NotificationBell() {
                         مخزون منخفض: {item.quantity} وحدة (الحد: {item.min_quantity})
                       </p>
                     </div>
-                  </div>
+                  </button>
                 ))}
                 {data.upcoming_installments.map(inst => {
                   const cur = (inst.sales?.currency ?? 'USD') as 'USD' | 'IQD'
                   const rate = inst.sales?.exchange_rate ?? IQD_RATE
                   const amtIQD = cur === 'IQD' ? inst.amount : Math.round(inst.amount * rate)
                   return (
-                    <div key={inst.id} className="flex items-start gap-3 px-4 py-3">
+                    <button
+                      key={inst.id}
+                      onClick={() => navigate('/sales')}
+                      className="w-full flex items-start gap-3 px-4 py-3 hover:bg-blue-50 transition-colors text-right"
+                    >
                       <div className="p-1.5 bg-blue-50 rounded-lg shrink-0 mt-0.5">
                         <CreditCard size={14} className="text-blue-500" />
                       </div>
@@ -96,7 +111,7 @@ export function NotificationBell() {
                         </p>
                         <p className="text-xs text-slate-400">{inst.due_date}</p>
                       </div>
-                    </div>
+                    </button>
                   )
                 })}
               </div>
